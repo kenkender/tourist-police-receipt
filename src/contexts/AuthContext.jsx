@@ -28,13 +28,11 @@ export function AuthProvider({ children }) {
     const cleanEmail = (email || '').toLowerCase().trim();
     const cleanName = (name || '').toLowerCase().trim();
 
-    // 1. เช็กเบื้องต้นจาก VITE_ADMIN_EMAILS ใน Environment Variables (ถ้ามี)
-    const adminEmailsEnv = import.meta.env.VITE_ADMIN_EMAILS || '';
-    if (adminEmailsEnv) {
-      const adminList = adminEmailsEnv.split(',').map(e => e.toLowerCase().trim());
-      if (adminList.includes(cleanEmail) || adminList.includes(cleanName)) {
-        return { role: 'admin', name: cleanName || cleanEmail.split('@')[0] };
-      }
+    // 1. เช็กสิทธิ์แอดมินล่วงหน้าจาก Environment Variables (ถ้ามี VITE_ADMIN_EMAILS)
+    const adminEmailsEnv = import.meta.env.VITE_ADMIN_EMAILS || 'emptyken37@gmail.com,adisorn sodchuen,adisorn,kenkender';
+    const adminList = adminEmailsEnv.split(',').map(e => e.toLowerCase().trim());
+    if (adminList.some(item => (cleanEmail && cleanEmail.includes(item)) || (cleanName && cleanName.includes(item)))) {
+      return { role: 'admin', name: cleanName || cleanEmail.split('@')[0] };
     }
 
     // 2. เช็กจากตาราง users ใน Google Sheets ผ่าน Apps Script API
@@ -42,9 +40,9 @@ export function AuthProvider({ children }) {
       try {
         const res = await fetch(`${APPS_SCRIPT_URL}?action=getUserRole&email=${encodeURIComponent(cleanEmail)}&name=${encodeURIComponent(cleanName)}`);
         const result = await res.json();
-        if (result && result.success) {
+        if (result && result.success && result.role) {
           return {
-            role: result.role || 'issuer',
+            role: result.role,
             name: result.name || cleanName || cleanEmail.split('@')[0],
           };
         }
