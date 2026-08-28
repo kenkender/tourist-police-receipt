@@ -41,7 +41,7 @@ function doGet(e) {
 }
 
 /**
- * POST request — บันทึกข้อมูล
+ * POST request — บันทึก หรือ ลบข้อมูล
  */
 function doPost(e) {
   const headers = {
@@ -57,7 +57,37 @@ function doPost(e) {
       return saveReceipt(data, headers);
     }
 
+    if (action === 'deleteReceipt') {
+      return deleteReceiptFromSheet(data, headers);
+    }
+
     return response({ success: false, error: 'Unknown action' }, headers);
+  } catch (err) {
+    return response({ success: false, error: err.message }, headers);
+  }
+}
+
+/**
+ * ลบรายการใบเสร็จออกจาก Google Sheets
+ */
+function deleteReceiptFromSheet(data, headers) {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(RECEIPTS_SHEET);
+    if (!sheet) return response({ success: true, message: 'Sheet not found' }, headers);
+
+    const existing = sheet.getDataRange().getValues();
+    for (let i = existing.length - 1; i >= 1; i--) {
+      const rowReceiptNo = String(existing[i][0]);
+      const rowBookNo = String(existing[i][1]);
+
+      if (rowReceiptNo === String(data.receiptNo) &&
+          (!data.bookNo || rowBookNo === String(data.bookNo))) {
+        sheet.deleteRow(i + 1); // 1-indexed row
+        return response({ success: true, message: 'ลบข้อมูลใน Sheets เรียบร้อย' }, headers);
+      }
+    }
+    return response({ success: true, message: 'ไม่พบรายการที่ต้องการลบใน Sheets' }, headers);
   } catch (err) {
     return response({ success: false, error: err.message }, headers);
   }
@@ -80,7 +110,6 @@ function getUserRole(email, name, headers) {
 
     const data = sheet.getDataRange().getValues();
 
-    // ค้นหาทั้งในคอลัมน์ A (email) และคอลัมน์ C (name)
     for (let i = 1; i < data.length; i++) {
       const rowEmail = String(data[i][0] || '').toLowerCase().trim();
       const rowRole = String(data[i][1] || 'issuer').toLowerCase().trim();
@@ -99,7 +128,6 @@ function getUserRole(email, name, headers) {
       }
     }
 
-    // หากไม่อยู่ในตาราง ให้สิทธิ์เริ่มต้นเป็น issuer (ผู้ออกใบเสร็จ)
     return response({
       success: true,
       email: cleanEmail,

@@ -157,9 +157,10 @@ export function ReceiptProvider({ children }) {
     }
   }, [receipts, currentUser, settings]);
 
-  // ลบใบเสร็จพร้อมคำนวณและปรับลดเลขที่ใบเสร็จถัดไปให้อัตโนมัติ
+  // ลบใบเสร็จพร้อมคำนวณและปรับลดเลขที่ใบเสร็จถัดไปให้อัตโนมัติ และลบแถวใน Google Sheets
   const deleteReceipt = useCallback((id) => {
     setReceipts(prev => {
+      const target = prev.find(r => r.id === id);
       const updated = prev.filter(r => r.id !== id);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
 
@@ -179,6 +180,23 @@ export function ReceiptProvider({ children }) {
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(updatedSettings));
         return updatedSettings;
       });
+
+      // ส่งคำขอลบไปยัง Google Sheets
+      const scriptUrl = GOOGLE_CONFIG.APPS_SCRIPT_URL;
+      if (target && scriptUrl) {
+        fetch(scriptUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            action: 'deleteReceipt',
+            receiptNo: target.receiptNo,
+            bookNo: target.bookNo,
+          }),
+        }).catch(err => {
+          console.warn('Google Sheets sync delete notice:', err);
+        });
+      }
 
       return updated;
     });
