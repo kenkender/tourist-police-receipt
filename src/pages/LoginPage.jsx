@@ -56,17 +56,21 @@ export default function LoginPage() {
     }
   };
 
-  // Google Sign-In Handler
+  // Google Sign-In Handler (ใช้ Google GIS SDK จริง)
   const handleGoogleLogin = async () => {
     setError('');
+    if (!GOOGLE_CONFIG.CLIENT_ID) {
+      setError('⚠️ ยังไม่ได้ตั้งค่า VITE_GOOGLE_CLIENT_ID ใน Vercel กรุณาใส่ Client ID จาก Google Cloud Console เพื่อเปิดระบบล็อกอิน Google ของจริงครับ');
+      return;
+    }
+
     setLoading(true);
     try {
-      if (GOOGLE_CONFIG.CLIENT_ID && window.google?.accounts?.id) {
+      if (window.google?.accounts?.id) {
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CONFIG.CLIENT_ID,
           callback: async (response) => {
             try {
-              // Decode JWT payload
               const base64Url = response.credential.split('.')[1];
               const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
               const jsonPayload = decodeURIComponent(
@@ -84,18 +88,16 @@ export default function LoginPage() {
               });
               navigate('/dashboard');
             } catch (err) {
-              setError('เกิดข้อผิดพลาดในการรับข้อมูลจาก Google: ' + err.message);
+              setError('เกิดข้อผิดพลาดจาก Google OAuth: ' + err.message);
             }
           },
         });
-        window.google.accounts.id.prompt((notification) => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            setPromptAccountModal('google');
-          }
-        });
+        window.google.accounts.id.prompt();
       } else {
-        // หากยังไม่ได้ใส่ VITE_GOOGLE_CLIENT_ID ใน Vercel ให้แสดงกล่องระบุบัญชี Google ใช้งาน
-        setPromptAccountModal('google');
+        // Redirect ไปยัง Google OAuth 2.0 Endpoint ของจริง
+        const redirectUri = window.location.origin + '/login';
+        const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=token&client_id=${GOOGLE_CONFIG.CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=email%20profile`;
+        window.location.href = googleAuthUrl;
       }
     } catch (err) {
       setError('ไม่สามารถลงชื่อเข้าใช้ด้วย Google ได้: ' + err.message);
@@ -104,9 +106,14 @@ export default function LoginPage() {
     }
   };
 
-  // LINE Login Handler
+  // LINE Login Handler (ใช้ LINE OAuth 2.0 / LIFF จริง)
   const handleLineLogin = async () => {
     setError('');
+    if (!LINE_CONFIG.LIFF_ID && !LINE_CONFIG.CHANNEL_ID) {
+      setError('⚠️ ยังไม่ได้ตั้งค่า VITE_LIFF_ID หรือ VITE_LINE_CHANNEL_ID ใน Vercel กรุณาใส่ Channel ID จาก LINE Developers Console เพื่อเปิดระบบล็อกอิน LINE ของจริงครับ');
+      return;
+    }
+
     setLoading(true);
     try {
       if (LINE_CONFIG.LIFF_ID && window.liff) {
@@ -123,42 +130,14 @@ export default function LoginPage() {
           });
           navigate('/dashboard');
         }
-      } else {
-        // หากยังไม่ได้ใส่ VITE_LIFF_ID ใน Vercel ให้แสดงกล่องระบุบัญชี LINE ใช้งาน
-        setPromptAccountModal('line');
+      } else if (LINE_CONFIG.CHANNEL_ID) {
+        // Redirect ไปยัง LINE OAuth Authorization Endpoint ของจริง
+        const redirectUri = window.location.origin + '/login';
+        const lineAuthUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${LINE_CONFIG.CHANNEL_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&state=line_login&scope=profile%20openid%20email`;
+        window.location.href = lineAuthUrl;
       }
     } catch (err) {
       setError('ไม่สามารถลงชื่อเข้าใช้ด้วย LINE ได้: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ดำเนินการ Social Sign-in จาก Modal
-  const submitSocialModal = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      if (promptAccountModal === 'google') {
-        const userEmail = socialEmailInput || 'officer.google@gmail.com';
-        await loginWithGoogle({
-          email: userEmail,
-          name: socialNameInput || userEmail.split('@')[0],
-          role: role,
-        });
-      } else if (promptAccountModal === 'line') {
-        const userName = socialNameInput || 'เจ้าหน้าที่ (LINE User)';
-        await loginWithLine({
-          userId: 'LINE_' + Math.random().toString(36).substring(2, 10),
-          displayName: userName,
-          email: socialEmailInput || '',
-          role: role,
-        });
-      }
-      setPromptAccountModal(null);
-      navigate('/dashboard');
-    } catch (err) {
-      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -368,10 +347,11 @@ export default function LoginPage() {
               borderRadius: 10,
               color: '#fca5a5',
               fontSize: 12,
-              display: 'flex', alignItems: 'center', gap: 8,
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+              lineHeight: 1.4,
             }}>
-              <Shield size={14} />
-              {error}
+              <Shield size={14} style={{ marginTop: 2, flexShrink: 0 }} />
+              <div>{error}</div>
             </div>
           )}
 
@@ -411,88 +391,8 @@ export default function LoginPage() {
           ระบบจัดเก็บข้อมูลกลาง เชื่อมต่อฐานข้อมูลปลอดภัย
         </div>
       </div>
-
-      {/* Social Login Dialog Modal (ใช้เมื่อคลิกโซเชียล) */}
-      {promptAccountModal && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 9999, padding: 20, backdropFilter: 'blur(6px)',
-        }}>
-          <div className="glass-card" style={{
-            width: '100%', maxWidth: 400, padding: 28,
-            background: '#0f1f3d', border: '1px solid #c9a84c',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              {promptAccountModal === 'google' ? (
-                <svg width="24" height="24" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-                </svg>
-              ) : (
-                <div style={{ width: 24, height: 24, borderRadius: 6, background: '#06C755', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ color: 'white', fontWeight: 900, fontSize: 10 }}>LINE</span>
-                </div>
-              )}
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e8edf5', margin: 0 }}>
-                ลงชื่อเข้าใช้ด้วย {promptAccountModal === 'google' ? 'Gmail / Google' : 'LINE Profile'}
-              </h3>
-            </div>
-
-            <p style={{ fontSize: 12, color: '#a8b5cc', marginBottom: 16, lineHeight: 1.5 }}>
-              ระบุข้อมูลบัญชีของคุณเพื่อเชื่อมต่อระบบในฐานะ <strong>{role === 'admin' ? 'ผู้ดูแลระบบ' : role === 'auditor' ? 'ผู้ตรวจสอบ' : 'ผู้ออกใบเสร็จ'}</strong>
-            </p>
-
-            <form onSubmit={submitSocialModal} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div>
-                <label className="form-label" style={{ fontSize: 11 }}>ชื่อ - นามสกุล ผู้ใช้งาน</label>
-                <input
-                  type="text"
-                  value={socialNameInput}
-                  onChange={e => setSocialNameInput(e.target.value)}
-                  className="form-input"
-                  placeholder={promptAccountModal === 'google' ? 'พ.ต.ท. สมชาย ใจดี' : 'สมชาย (LINE)'}
-                  style={{ fontSize: 13, padding: '8px 12px' }}
-                />
-              </div>
-
-              <div>
-                <label className="form-label" style={{ fontSize: 11 }}>อีเมลบัญชี {promptAccountModal === 'google' ? 'Gmail' : 'LINE'}</label>
-                <input
-                  type="email"
-                  value={socialEmailInput}
-                  onChange={e => setSocialEmailInput(e.target.value)}
-                  className="form-input"
-                  placeholder={promptAccountModal === 'google' ? 'somchai@gmail.com' : 'somchai@line.me'}
-                  style={{ fontSize: 13, padding: '8px 12px' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-                <button
-                  type="button"
-                  onClick={() => setPromptAccountModal(null)}
-                  className="btn btn-ghost"
-                  style={{ flex: 1, justifyContent: 'center' }}
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-gold"
-                  style={{ flex: 1, justifyContent: 'center' }}
-                >
-                  เข้าสู่ระบบ
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
+
 
