@@ -2,46 +2,58 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 0;
+    margin: 10mm;
   }
 
-  /* บังคับพื้นหลังของทุกคอนเทนเนอร์และ Modal ให้เป็นสีขาวบริสุทธิ์ */
-  html, body, #root, main, section, article, div, canvas, .modal-overlay, .modal-box, .app-container, .glass-card {
+  /* บังคับพื้นหลังทั้งหมดเป็นสีขาวบริสุทธิ์ */
+  html, body {
+    width: 210mm;
+    margin: 0 !important;
+    padding: 0 !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
     background-image: none !important;
-    box-shadow: none !important;
-    border: none !important;
     color: #000000 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    filter: none !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    animation: none !important;
-  }
-
-  html, body {
-    width: 210mm;
-    height: 297mm;
     font-family: 'Sarabun', sans-serif !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     overflow: hidden !important;
   }
 
-  /* ซ่อนส่วนประกอบ UI อื่นๆ ปุ่มกด ป๊อปอัป และ Canvas ดาวลอย ทั้งหมด */
-  canvas, nav, header, footer, .no-print, button, .btn, svg:not(.receipt-print-wrapper svg) {
+  /* ซ่อน Canvas ดาวลอย, Navbar, ปุ่ม, overlay ทั้งหมด */
+  canvas, nav, header, footer, .no-print, button, .btn,
+  .modal-overlay, [class*="canvas"], [class*="star"] {
     display: none !important;
   }
 
-  /* แสดงเฉพาะตัวใบเสร็จบนกระดาษ A4 */
+  /* รีเซ็ต background ของ wrapper และ modal box แต่ไม่แตะกรอบใบเสร็จ */
+  #root, body > div, .modal-box, .glass-card,
+  .app-container, main, section {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    animation: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* ห้ามลบกรอบภายใน .receipt-print-wrapper */
+  .receipt-print-wrapper,
+  .receipt-print-wrapper * {
+    border-color: currentColor !important;
+    box-shadow: none !important;
+  }
+
+  /* แสดงเฉพาะส่วนใบเสร็จ อยู่กึ่งกลาง A4 */
   .receipt-print-wrapper {
     display: block !important;
     visibility: visible !important;
-    width: 210mm !important;
-    max-width: 210mm !important;
-    padding: 8mm 10mm !important;
+    width: 190mm !important;
+    max-width: 190mm !important;
+    padding: 4mm 6mm !important;
     margin: 0 auto !important;
     box-sizing: border-box !important;
     background: #ffffff !important;
