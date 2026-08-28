@@ -1,0 +1,50 @@
+/* Print CSS — สั่งพิมพ์ลงกระดาษ A4 1 หน้ากระดาษพอดีเป๊ะ */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  html, body {
+    width: 210mm;
+    height: 297mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-family: 'Sarabun', sans-serif !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    overflow: hidden !important;
+  }
+
+  /* ซ่อนส่วนประกอบ UI อื่นๆ ทั้งหมดในหน้าเว็บ */
+  .no-print, nav, header, footer, .sidebar, button, .glass-card > div:first-child {
+    display: none !important;
+  }
+
+  /* ซ่อน background การ์ด */
+  .glass-card {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* แสดงเฉพาะส่วนใบเสร็จ */
+  .receipt-print-wrapper {
+    width: 210mm !important;
+    max-width: 210mm !important;
+    padding: 8mm 10mm !important;
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
+  }
+
+  /* ป้องกันไม่ให้ขึ้นหน้าใหม่ */
+  * {
+    page-break-inside: avoid !important;
+    page-break-before: avoid !important;
+    page-break-after: avoid !important;
+  }
+}
