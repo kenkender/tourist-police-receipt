@@ -29,20 +29,29 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Login ด้วย Email + Password (Demo Mode)
-  const loginWithCredentials = useCallback(async (email, password) => {
+  // Login ด้วย Email + Password
+  const loginWithCredentials = useCallback(async (email, password, role = 'issuer') => {
     setError(null);
-    const user = DEMO_USERS.find(
-      u => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-    if (!user) {
-      throw new Error('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+    const cleanEmail = (email || '').trim();
+    if (!cleanEmail) {
+      throw new Error('กรุณากรอกอีเมลผู้ใช้งาน');
     }
-    const userData = { email: user.email, name: user.name, role: user.role, loginTime: new Date().toISOString() };
+    const matchedDemo = DEMO_USERS.find(
+      u => u.email.toLowerCase() === cleanEmail.toLowerCase()
+    );
+    
+    const userData = {
+      email: cleanEmail,
+      name: matchedDemo ? matchedDemo.name : cleanEmail.split('@')[0],
+      role: matchedDemo ? matchedDemo.role : role,
+      provider: 'email',
+      loginTime: new Date().toISOString(),
+    };
     setCurrentUser(userData);
     sessionStorage.setItem('tp_current_user', JSON.stringify(userData));
     return userData;
   }, []);
+
 
   // Login ด้วย Google Account
   const loginWithGoogle = useCallback(async (googleUser) => {

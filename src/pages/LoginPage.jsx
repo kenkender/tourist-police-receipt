@@ -9,19 +9,15 @@ import { GOOGLE_CONFIG, LINE_CONFIG } from '../config/google.config';
 export default function LoginPage() {
   const { loginWithCredentials, loginWithGoogle, loginWithLine } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState('issuer');
+  const [email, setEmail] = useState('admin@touristpolice.go.th');
+  const [password, setPassword] = useState('admin1234');
+  const [role, setRole] = useState('admin');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [promptAccountModal, setPromptAccountModal] = useState(null); // 'google' | 'line'
-  const [socialEmailInput, setSocialEmailInput] = useState('');
-  const [socialNameInput, setSocialNameInput] = useState('');
 
   // โหลด Google GIS และ LINE LIFF SDK ในลักษณะ Dynamic
   useEffect(() => {
-    // 1. Google GIS SDK
     if (!document.getElementById('google-gis-script')) {
       const script = document.createElement('script');
       script.id = 'google-gis-script';
@@ -30,8 +26,6 @@ export default function LoginPage() {
       script.defer = true;
       document.head.appendChild(script);
     }
-
-    // 2. LINE LIFF SDK
     if (!document.getElementById('line-liff-script')) {
       const script = document.createElement('script');
       script.id = 'line-liff-script';
@@ -47,7 +41,7 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await loginWithCredentials(email, password);
+      await loginWithCredentials(email, password, role);
       navigate('/dashboard');
     } catch (err) {
       setError(err.message);
@@ -56,7 +50,7 @@ export default function LoginPage() {
     }
   };
 
-  // Google Sign-In Handler (ใช้ Google GIS SDK จริง)
+  // Google Sign-In Handler
   const handleGoogleLogin = async () => {
     setError('');
     if (!GOOGLE_CONFIG.CLIENT_ID) {
@@ -66,35 +60,34 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      if (window.google?.accounts?.id) {
-        window.google.accounts.id.initialize({
+      if (window.google?.accounts?.oauth2) {
+        const client = window.google.accounts.oauth2.initTokenClient({
           client_id: GOOGLE_CONFIG.CLIENT_ID,
-          callback: async (response) => {
-            try {
-              const base64Url = response.credential.split('.')[1];
-              const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-              const jsonPayload = decodeURIComponent(
-                atob(base64)
-                  .split('')
-                  .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-                  .join('')
-              );
-              const payload = JSON.parse(jsonPayload);
-              await loginWithGoogle({
-                email: payload.email,
-                name: payload.name,
-                picture: payload.picture,
-                role: role,
-              });
-              navigate('/dashboard');
-            } catch (err) {
-              setError('เกิดข้อผิดพลาดจาก Google OAuth: ' + err.message);
+          scope: 'email profile',
+          callback: async (tokenResponse) => {
+            if (tokenResponse.access_token) {
+              try {
+                // Fetch Google Profile info
+                const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                  headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+                });
+                const userInfo = await res.json();
+                await loginWithGoogle({
+                  email: userInfo.email,
+                  name: userInfo.name,
+                  picture: userInfo.picture,
+                  role: role,
+                });
+                navigate('/dashboard');
+              } catch (err) {
+                setError('เกิดข้อผิดพลาดในการดึงข้อมูลจาก Google: ' + err.message);
+              }
             }
           },
         });
-        window.google.accounts.id.prompt();
+        client.requestAccessToken();
       } else {
-        // Redirect ไปยัง Google OAuth 2.0 Endpoint ของจริง
+        // Fallback standard OAuth popup window
         const redirectUri = window.location.origin + '/login';
         const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=token&client_id=${GOOGLE_CONFIG.CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=email%20profile`;
         window.location.href = googleAuthUrl;
@@ -106,7 +99,7 @@ export default function LoginPage() {
     }
   };
 
-  // LINE Login Handler (ใช้ LINE OAuth 2.0 / LIFF จริง)
+  // LINE Login Handler
   const handleLineLogin = async () => {
     setError('');
     if (!LINE_CONFIG.LIFF_ID && !LINE_CONFIG.CHANNEL_ID) {
@@ -131,7 +124,6 @@ export default function LoginPage() {
           navigate('/dashboard');
         }
       } else if (LINE_CONFIG.CHANNEL_ID) {
-        // Redirect ไปยัง LINE OAuth Authorization Endpoint ของจริง
         const redirectUri = window.location.origin + '/login';
         const lineAuthUrl = `https://access.line.me/oauth2/v2.1/authorize?response_type=code&client_id=${LINE_CONFIG.CHANNEL_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&state=line_login&scope=profile%20openid%20email`;
         window.location.href = lineAuthUrl;
@@ -142,6 +134,12 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  const demoAccounts = [
+    { label: 'Admin (ผู้ดูแลระบบ)', email: 'admin@touristpolice.go.th', password: 'admin1234', role: 'admin' },
+    { label: 'เจ้าหน้าที่ออกใบเสร็จ', email: 'officer1@touristpolice.go.th', password: 'officer1234', role: 'issuer' },
+  ];
+
 
   return (
     <div style={{
@@ -297,8 +295,29 @@ export default function LoginPage() {
           <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
         </div>
 
+        {/* Demo Account Quick Shortcuts */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: '#6b7a99', marginBottom: 6, textAlign: 'center' }}>
+            คลิกเพื่อใช้บัญชีตัวอย่าง:
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {demoAccounts.map(acc => (
+              <button
+                key={acc.email}
+                type="button"
+                onClick={() => { setEmail(acc.email); setPassword(acc.password); setRole(acc.role); }}
+                className="btn btn-ghost btn-sm"
+                style={{ flex: 1, justifyContent: 'center', fontSize: 10, padding: '4px 8px' }}
+              >
+                {acc.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Login Form */}
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
           <div className="form-group">
             <label className="form-label" style={{ fontSize: 11 }}>อีเมลผู้ใช้งาน</label>
             <input
