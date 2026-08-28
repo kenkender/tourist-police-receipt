@@ -147,7 +147,7 @@ function ReceiptCopy({ data, copyType }) {
       <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 2 }}>
         <div style={{ textAlign: 'center', width: 220 }}>
           <div style={{ fontSize: 11, marginBottom: 2 }}>
-            ลงชื่อ {signerRank}
+            ลงชื่อ
           </div>
           <div style={{
             height: 36, borderBottom: '1px solid #94a3b8',
@@ -155,7 +155,9 @@ function ReceiptCopy({ data, copyType }) {
           }}>
             <span style={{ color: '#cbd5e1', fontSize: 11, fontStyle: 'italic' }}>( ลายมือชื่อ )</span>
           </div>
-          <div style={{ fontSize: 12, fontWeight: 600 }}>({signerName || '—'})</div>
+          <div style={{ fontSize: 12, fontWeight: 600 }}>
+            ({signerRank ? `${signerRank} ` : ''}{signerName || '—'})
+          </div>
           <div style={{ fontSize: 11, color: '#475569', marginTop: 1 }}>{signerPosition || ''}</div>
         </div>
       </div>
