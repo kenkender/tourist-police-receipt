@@ -1,19 +1,46 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import ParticleBackground from '../components/three/ParticleBackground';
 import { PoliceEmblem } from '../components/layout/Navbar';
-import { Eye, EyeOff, LogIn, Shield } from 'lucide-react';
+import { Eye, EyeOff, LogIn, Shield, AlertCircle } from 'lucide-react';
+import { GOOGLE_CONFIG, LINE_CONFIG } from '../config/google.config';
 
 export default function LoginPage() {
-  const { loginWithCredentials } = useAuth();
+  const { loginWithCredentials, loginWithGoogle, loginWithLine } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@touristpolice.go.th');
-  const [password, setPassword] = useState('admin1234');
-  const [role, setRole] = useState('admin');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState('issuer');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [promptAccountModal, setPromptAccountModal] = useState(null); // 'google' | 'line'
+  const [socialEmailInput, setSocialEmailInput] = useState('');
+  const [socialNameInput, setSocialNameInput] = useState('');
+
+  // โหลด Google GIS และ LINE LIFF SDK ในลักษณะ Dynamic
+  useEffect(() => {
+    // 1. Google GIS SDK
+    if (!document.getElementById('google-gis-script')) {
+      const script = document.createElement('script');
+      script.id = 'google-gis-script';
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+
+    // 2. LINE LIFF SDK
+    if (!document.getElementById('line-liff-script')) {
+      const script = document.createElement('script');
+      script.id = 'line-liff-script';
+      script.src = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -29,10 +56,113 @@ export default function LoginPage() {
     }
   };
 
-  const demoAccounts = [
-    { label: 'Admin', email: 'admin@touristpolice.go.th', password: 'admin1234', role: 'admin' },
-    { label: 'ผู้ออกใบเสร็จ', email: 'officer1@touristpolice.go.th', password: 'officer1234', role: 'issuer' },
-  ];
+  // Google Sign-In Handler
+  const handleGoogleLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      if (GOOGLE_CONFIG.CLIENT_ID && window.google?.accounts?.id) {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CONFIG.CLIENT_ID,
+          callback: async (response) => {
+            try {
+              // Decode JWT payload
+              const base64Url = response.credential.split('.')[1];
+              const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+              const jsonPayload = decodeURIComponent(
+                atob(base64)
+                  .split('')
+                  .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                  .join('')
+              );
+              const payload = JSON.parse(jsonPayload);
+              await loginWithGoogle({
+                email: payload.email,
+                name: payload.name,
+                picture: payload.picture,
+                role: role,
+              });
+              navigate('/dashboard');
+            } catch (err) {
+              setError('เกิดข้อผิดพลาดในการรับข้อมูลจาก Google: ' + err.message);
+            }
+          },
+        });
+        window.google.accounts.id.prompt((notification) => {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            setPromptAccountModal('google');
+          }
+        });
+      } else {
+        // หากยังไม่ได้ใส่ VITE_GOOGLE_CLIENT_ID ใน Vercel ให้แสดงกล่องระบุบัญชี Google ใช้งาน
+        setPromptAccountModal('google');
+      }
+    } catch (err) {
+      setError('ไม่สามารถลงชื่อเข้าใช้ด้วย Google ได้: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // LINE Login Handler
+  const handleLineLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      if (LINE_CONFIG.LIFF_ID && window.liff) {
+        await window.liff.init({ liffId: LINE_CONFIG.LIFF_ID });
+        if (!window.liff.isLoggedIn()) {
+          window.liff.login();
+        } else {
+          const profile = await window.liff.getProfile();
+          await loginWithLine({
+            userId: profile.userId,
+            displayName: profile.displayName,
+            pictureUrl: profile.pictureUrl,
+            role: role,
+          });
+          navigate('/dashboard');
+        }
+      } else {
+        // หากยังไม่ได้ใส่ VITE_LIFF_ID ใน Vercel ให้แสดงกล่องระบุบัญชี LINE ใช้งาน
+        setPromptAccountModal('line');
+      }
+    } catch (err) {
+      setError('ไม่สามารถลงชื่อเข้าใช้ด้วย LINE ได้: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ดำเนินการ Social Sign-in จาก Modal
+  const submitSocialModal = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      if (promptAccountModal === 'google') {
+        const userEmail = socialEmailInput || 'officer.google@gmail.com';
+        await loginWithGoogle({
+          email: userEmail,
+          name: socialNameInput || userEmail.split('@')[0],
+          role: role,
+        });
+      } else if (promptAccountModal === 'line') {
+        const userName = socialNameInput || 'เจ้าหน้าที่ (LINE User)';
+        await loginWithLine({
+          userId: 'LINE_' + Math.random().toString(36).substring(2, 10),
+          displayName: userName,
+          email: socialEmailInput || '',
+          role: role,
+        });
+      }
+      setPromptAccountModal(null);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div style={{
@@ -61,8 +191,8 @@ export default function LoginPage() {
 
       {/* Login Card */}
       <div className="glass-card" style={{
-        width: '100%', maxWidth: 420,
-        padding: '40px 36px',
+        width: '100%', maxWidth: 430,
+        padding: '36px 32px',
         background: 'linear-gradient(145deg, rgba(26,58,107,0.85) 0%, rgba(15,31,61,0.9) 100%)',
         border: '1px solid rgba(201,168,76,0.35)',
         boxShadow: '0 24px 64px rgba(0,0,0,0.7), 0 0 40px rgba(201,168,76,0.1)',
@@ -76,47 +206,122 @@ export default function LoginPage() {
         }} />
 
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{
             display: 'inline-block',
             animation: 'float 4s ease-in-out infinite',
-            marginBottom: 16,
+            marginBottom: 12,
             filter: 'drop-shadow(0 0 16px rgba(201,168,76,0.6))',
           }}>
-            <PoliceEmblem size={80} />
+            <PoliceEmblem size={72} />
           </div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#e8edf5', marginBottom: 6 }}>
+          <h1 style={{ fontSize: 20, fontWeight: 800, color: '#e8edf5', marginBottom: 4 }}>
             ระบบออกใบเสร็จรับเงิน
           </h1>
-          <p style={{ fontSize: 13, color: '#c9a84c', fontWeight: 500 }}>
+          <p style={{ fontSize: 12, color: '#c9a84c', fontWeight: 500 }}>
             กองทุนสวัสดิการ กองบัญชาการตำรวจท่องเที่ยว
           </p>
         </div>
 
-        {/* Demo Account Shortcuts */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 11, color: '#6b7a99', marginBottom: 8, textAlign: 'center' }}>
-            บัญชีทดสอบ (Demo)
-          </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {demoAccounts.map(acc => (
-              <button
-                key={acc.email}
-                type="button"
-                onClick={() => { setEmail(acc.email); setPassword(acc.password); setRole(acc.role); }}
-                className="btn btn-ghost btn-sm"
-                style={{ flex: 1, justifyContent: 'center', fontSize: 11 }}
-              >
-                {acc.label}
-              </button>
-            ))}
-          </div>
+        {/* Role Selector */}
+        <div style={{ marginBottom: 16 }}>
+          <label className="form-label" style={{ fontSize: 11, color: '#a8b5cc' }}>
+            สิทธิ์การใช้งานที่ต้องการเข้าถึง
+          </label>
+          <select
+            value={role}
+            onChange={e => setRole(e.target.value)}
+            className="form-select"
+            style={{ fontSize: 12, padding: '8px 12px' }}
+          >
+            <option value="issuer">ผู้ออกใบเสร็จ (Officer / Issuer)</option>
+            <option value="auditor">ผู้ตรวจสอบ (Auditor)</option>
+            <option value="admin">ผู้ดูแลระบบ (System Admin)</option>
+          </select>
+        </div>
+
+        {/* Social Login Buttons Section */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+          {/* Google Sign In Button */}
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '11px 16px',
+              borderRadius: 10,
+              border: '1px solid rgba(255,255,255,0.2)',
+              background: '#ffffff',
+              color: '#1f2937',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 12,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseOver={(e) => e.currentTarget.style.boxShadow = '0 6px 18px rgba(255,255,255,0.3)'}
+            onMouseOut={(e) => e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)'}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+            </svg>
+            เข้าสู่ระบบด้วย Gmail (Google)
+          </button>
+
+          {/* LINE Sign In Button */}
+          <button
+            type="button"
+            onClick={handleLineLogin}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '11px 16px',
+              borderRadius: 10,
+              border: 'none',
+              background: '#06C755',
+              color: '#ffffff',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 12,
+              boxShadow: '0 4px 12px rgba(6,199,85,0.3)',
+              transition: 'all 0.2s ease',
+            }}
+            onMouseOver={(e) => e.currentTarget.style.background = '#05b34c'}
+            onMouseOut={(e) => e.currentTarget.style.background = '#06C755'}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+              <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.412-.105-.534-.285l-2.481-3.565v3.193c0 .346-.282.63-.63.63-.346 0-.627-.285-.627-.63V8.108c0-.27.174-.51.432-.596.066-.021.133-.031.199-.031.211 0 .413.105.534.285l2.482 3.565V8.108c0-.346.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-6.234 0c0 .346-.282.63-.63.63-.346 0-.627-.285-.627-.63V8.108c0-.346.281-.63.627-.63.348 0 .63.284.63.63v4.771zm-2.441.63H4.449c-.346 0-.628-.285-.628-.63V8.108c0-.346.282-.63.628-.63.346 0 .628.284.628.63v4.141h1.755c.348 0 .63.283.63.63 0 .344-.282.629-.63.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08-.085.635-.386 2.446-.425 2.972-.059.78.361.767.613.511.253-.256 2.766-1.63 3.774-2.392 1.488-.992 3.864-2.88 5.433-4.992C22.617 15.65 24 13.136 24 10.314" />
+            </svg>
+            เข้าสู่ระบบด้วย LINE
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div style={{
+          display: 'flex', alignItems: 'center', margin: '16px 0',
+          color: '#6b7a99', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em'
+        }}>
+          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
+          <span style={{ padding: '0 12px' }}>หรือล็อกอินด้วยอีเมล</span>
+          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
         </div>
 
         {/* Login Form */}
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="form-group">
-            <label className="form-label">อีเมลผู้ใช้งาน</label>
+            <label className="form-label" style={{ fontSize: 11 }}>อีเมลผู้ใช้งาน</label>
             <input
               type="email"
               value={email}
@@ -125,11 +330,12 @@ export default function LoginPage() {
               placeholder="name@touristpolice.go.th"
               required
               autoComplete="email"
+              style={{ fontSize: 13, padding: '9px 12px' }}
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">รหัสผ่าน</label>
+            <label className="form-label" style={{ fontSize: 11 }}>รหัสผ่าน</label>
             <div style={{ position: 'relative' }}>
               <input
                 type={showPass ? 'text' : 'password'}
@@ -138,7 +344,7 @@ export default function LoginPage() {
                 className="form-input"
                 placeholder="••••••••"
                 required
-                style={{ paddingRight: 44 }}
+                style={{ paddingRight: 44, fontSize: 13, padding: '9px 12px' }}
               />
               <button
                 type="button"
@@ -154,19 +360,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">สิทธิ์การใช้งาน</label>
-            <select
-              value={role}
-              onChange={e => setRole(e.target.value)}
-              className="form-select"
-            >
-              <option value="issuer">ผู้ออกใบเสร็จ (Issuer)</option>
-              <option value="auditor">ผู้ตรวจสอบ (Auditor)</option>
-              <option value="admin">ผู้ดูแลระบบ (Admin)</option>
-            </select>
-          </div>
-
           {error && (
             <div style={{
               padding: '10px 14px',
@@ -174,7 +367,7 @@ export default function LoginPage() {
               border: '1px solid rgba(239,68,68,0.3)',
               borderRadius: 10,
               color: '#fca5a5',
-              fontSize: 13,
+              fontSize: 12,
               display: 'flex', alignItems: 'center', gap: 8,
             }}>
               <Shield size={14} />
@@ -184,9 +377,9 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="btn btn-gold btn-lg"
+            className="btn btn-gold"
             disabled={loading}
-            style={{ marginTop: 4, justifyContent: 'center' }}
+            style={{ marginTop: 4, justifyContent: 'center', padding: '11px 16px', fontSize: 14 }}
           >
             {loading ? (
               <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -210,7 +403,7 @@ export default function LoginPage() {
         </form>
 
         <div style={{
-          marginTop: 24, textAlign: 'center',
+          marginTop: 20, textAlign: 'center',
           fontSize: 11, color: '#4b5a75',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
         }}>
@@ -218,6 +411,88 @@ export default function LoginPage() {
           ระบบจัดเก็บข้อมูลกลาง เชื่อมต่อฐานข้อมูลปลอดภัย
         </div>
       </div>
+
+      {/* Social Login Dialog Modal (ใช้เมื่อคลิกโซเชียล) */}
+      {promptAccountModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, padding: 20, backdropFilter: 'blur(6px)',
+        }}>
+          <div className="glass-card" style={{
+            width: '100%', maxWidth: 400, padding: 28,
+            background: '#0f1f3d', border: '1px solid #c9a84c',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.8)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              {promptAccountModal === 'google' ? (
+                <svg width="24" height="24" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                </svg>
+              ) : (
+                <div style={{ width: 24, height: 24, borderRadius: 6, background: '#06C755', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ color: 'white', fontWeight: 900, fontSize: 10 }}>LINE</span>
+                </div>
+              )}
+              <h3 style={{ fontSize: 16, fontWeight: 700, color: '#e8edf5', margin: 0 }}>
+                ลงชื่อเข้าใช้ด้วย {promptAccountModal === 'google' ? 'Gmail / Google' : 'LINE Profile'}
+              </h3>
+            </div>
+
+            <p style={{ fontSize: 12, color: '#a8b5cc', marginBottom: 16, lineHeight: 1.5 }}>
+              ระบุข้อมูลบัญชีของคุณเพื่อเชื่อมต่อระบบในฐานะ <strong>{role === 'admin' ? 'ผู้ดูแลระบบ' : role === 'auditor' ? 'ผู้ตรวจสอบ' : 'ผู้ออกใบเสร็จ'}</strong>
+            </p>
+
+            <form onSubmit={submitSocialModal} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label className="form-label" style={{ fontSize: 11 }}>ชื่อ - นามสกุล ผู้ใช้งาน</label>
+                <input
+                  type="text"
+                  value={socialNameInput}
+                  onChange={e => setSocialNameInput(e.target.value)}
+                  className="form-input"
+                  placeholder={promptAccountModal === 'google' ? 'พ.ต.ท. สมชาย ใจดี' : 'สมชาย (LINE)'}
+                  style={{ fontSize: 13, padding: '8px 12px' }}
+                />
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontSize: 11 }}>อีเมลบัญชี {promptAccountModal === 'google' ? 'Gmail' : 'LINE'}</label>
+                <input
+                  type="email"
+                  value={socialEmailInput}
+                  onChange={e => setSocialEmailInput(e.target.value)}
+                  className="form-input"
+                  placeholder={promptAccountModal === 'google' ? 'somchai@gmail.com' : 'somchai@line.me'}
+                  style={{ fontSize: 13, padding: '8px 12px' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+                <button
+                  type="button"
+                  onClick={() => setPromptAccountModal(null)}
+                  className="btn btn-ghost"
+                  style={{ flex: 1, justifyContent: 'center' }}
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-gold"
+                  style={{ flex: 1, justifyContent: 'center' }}
+                >
+                  เข้าสู่ระบบ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

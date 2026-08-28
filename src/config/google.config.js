@@ -24,6 +24,13 @@ export const GOOGLE_CONFIG = {
   DISCOVERY_DOC: 'https://sheets.googleapis.com/$discovery/rest?version=v4',
 };
 
+// LINE Login Configuration
+export const LINE_CONFIG = {
+  CHANNEL_ID: import.meta.env.VITE_LINE_CHANNEL_ID || '',
+  LIFF_ID: import.meta.env.VITE_LIFF_ID || '',
+};
+
+
 // Sheet Names
 export const SHEET_NAMES = {
   RECEIPTS: 'receipts',

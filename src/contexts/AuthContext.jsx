@@ -44,6 +44,39 @@ export function AuthProvider({ children }) {
     return userData;
   }, []);
 
+  // Login ด้วย Google Account
+  const loginWithGoogle = useCallback(async (googleUser) => {
+    setError(null);
+    const userData = {
+      email: googleUser.email,
+      name: googleUser.name || googleUser.email.split('@')[0],
+      picture: googleUser.picture || null,
+      role: googleUser.role || 'issuer',
+      provider: 'google',
+      loginTime: new Date().toISOString(),
+    };
+    setCurrentUser(userData);
+    sessionStorage.setItem('tp_current_user', JSON.stringify(userData));
+    return userData;
+  }, []);
+
+  // Login ด้วย LINE Profile
+  const loginWithLine = useCallback(async (lineUser) => {
+    setError(null);
+    const userData = {
+      email: lineUser.email || `${lineUser.userId.substring(0, 8)}@line.me`,
+      name: lineUser.displayName || 'ผู้ใช้ LINE',
+      picture: lineUser.pictureUrl || null,
+      lineUserId: lineUser.userId,
+      role: lineUser.role || 'issuer',
+      provider: 'line',
+      loginTime: new Date().toISOString(),
+    };
+    setCurrentUser(userData);
+    sessionStorage.setItem('tp_current_user', JSON.stringify(userData));
+    return userData;
+  }, []);
+
   // Logout
   const logout = useCallback(() => {
     setCurrentUser(null);
@@ -71,6 +104,8 @@ export function AuthProvider({ children }) {
     loading,
     error,
     loginWithCredentials,
+    loginWithGoogle,
+    loginWithLine,
     logout,
     hasRole,
     getRoleName,

@@ -117,9 +117,38 @@ export default function Navbar() {
 
         {/* User Info + Logout */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {/* User Profile Avatar / Image */}
+          {currentUser.picture ? (
+            <img
+              src={currentUser.picture}
+              alt={currentUser.name}
+              style={{
+                width: 34, height: 34, borderRadius: '50%',
+                border: '2px solid #c9a84c', objectFit: 'cover',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+              }}
+            />
+          ) : (
+            <div style={{
+              width: 34, height: 34, borderRadius: '50%',
+              background: currentUser.provider === 'line' ? '#06C755' : currentUser.provider === 'google' ? '#4285F4' : 'linear-gradient(135deg, #1e4080, #c9a84c)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#ffffff', fontWeight: 800, fontSize: 13,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+            }}>
+              {currentUser.name ? currentUser.name.substring(0, 1).toUpperCase() : 'U'}
+            </div>
+          )}
+
           <div className="hide-mobile" style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#e8edf5' }}>
-              {currentUser.email}
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#e8edf5', display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+              <span>{currentUser.name || currentUser.email}</span>
+              {currentUser.provider === 'google' && (
+                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 4, background: '#4285F4', color: 'white', fontWeight: 700 }}>Google</span>
+              )}
+              {currentUser.provider === 'line' && (
+                <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 4, background: '#06C755', color: 'white', fontWeight: 700 }}>LINE</span>
+              )}
             </div>
             <div style={{ fontSize: 11, color: '#c9a84c', display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
               {isAdmin && <Shield size={10} />}
@@ -134,6 +163,7 @@ export default function Navbar() {
           >
             <LogOut size={16} />
           </button>
+
           {/* Mobile menu toggle */}
           <button
             className="hide-desktop btn btn-ghost btn-icon"
