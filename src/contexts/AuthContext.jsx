@@ -3,13 +3,6 @@ import { GOOGLE_CONFIG } from '../config/google.config';
 
 const AuthContext = createContext(null);
 
-// Demo users สำหรับทดสอบก่อน connect Google Sheets
-const DEMO_USERS = [
-  { email: 'admin@touristpolice.go.th', password: 'admin1234', role: 'admin', name: 'ผู้ดูแลระบบ' },
-  { email: 'officer1@touristpolice.go.th', password: 'officer1234', role: 'issuer', name: 'เจ้าหน้าที่ 1' },
-  { email: 'auditor@touristpolice.go.th', password: 'auditor1234', role: 'auditor', name: 'ผู้ตรวจสอบ' },
-];
-
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -36,14 +29,10 @@ export function AuthProvider({ children }) {
     if (!cleanEmail) {
       throw new Error('กรุณากรอกอีเมลผู้ใช้งาน');
     }
-    const matchedDemo = DEMO_USERS.find(
-      u => u.email.toLowerCase() === cleanEmail.toLowerCase()
-    );
-    
     const userData = {
       email: cleanEmail,
-      name: matchedDemo ? matchedDemo.name : cleanEmail.split('@')[0],
-      role: matchedDemo ? matchedDemo.role : role,
+      name: cleanEmail.split('@')[0],
+      role: role,
       provider: 'email',
       loginTime: new Date().toISOString(),
     };
@@ -51,7 +40,6 @@ export function AuthProvider({ children }) {
     sessionStorage.setItem('tp_current_user', JSON.stringify(userData));
     return userData;
   }, []);
-
 
   // Login ด้วย Google Account
   const loginWithGoogle = useCallback(async (googleUser) => {

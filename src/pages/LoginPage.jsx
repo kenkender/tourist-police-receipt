@@ -3,15 +3,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import ParticleBackground from '../components/three/ParticleBackground';
 import { PoliceEmblem } from '../components/layout/Navbar';
-import { Eye, EyeOff, LogIn, Shield, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, LogIn, Shield } from 'lucide-react';
 import { GOOGLE_CONFIG, LINE_CONFIG } from '../config/google.config';
 
 export default function LoginPage() {
   const { loginWithCredentials, loginWithGoogle, loginWithLine } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@touristpolice.go.th');
-  const [password, setPassword] = useState('admin1234');
-  const [role, setRole] = useState('admin');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [role, setRole] = useState('issuer');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -67,7 +67,6 @@ export default function LoginPage() {
           callback: async (tokenResponse) => {
             if (tokenResponse.access_token) {
               try {
-                // Fetch Google Profile info
                 const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
                   headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
                 });
@@ -87,7 +86,6 @@ export default function LoginPage() {
         });
         client.requestAccessToken();
       } else {
-        // Fallback standard OAuth popup window
         const redirectUri = window.location.origin + '/login';
         const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=token&client_id=${GOOGLE_CONFIG.CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=email%20profile`;
         window.location.href = googleAuthUrl;
@@ -134,12 +132,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
-
-  const demoAccounts = [
-    { label: 'Admin (ผู้ดูแลระบบ)', email: 'admin@touristpolice.go.th', password: 'admin1234', role: 'admin' },
-    { label: 'เจ้าหน้าที่ออกใบเสร็จ', email: 'officer1@touristpolice.go.th', password: 'officer1234', role: 'issuer' },
-  ];
-
 
   return (
     <div style={{
@@ -295,29 +287,8 @@ export default function LoginPage() {
           <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
         </div>
 
-        {/* Demo Account Quick Shortcuts */}
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, color: '#6b7a99', marginBottom: 6, textAlign: 'center' }}>
-            คลิกเพื่อใช้บัญชีตัวอย่าง:
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {demoAccounts.map(acc => (
-              <button
-                key={acc.email}
-                type="button"
-                onClick={() => { setEmail(acc.email); setPassword(acc.password); setRole(acc.role); }}
-                className="btn btn-ghost btn-sm"
-                style={{ flex: 1, justifyContent: 'center', fontSize: 10, padding: '4px 8px' }}
-              >
-                {acc.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Login Form */}
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
           <div className="form-group">
             <label className="form-label" style={{ fontSize: 11 }}>อีเมลผู้ใช้งาน</label>
             <input
@@ -413,5 +384,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-
