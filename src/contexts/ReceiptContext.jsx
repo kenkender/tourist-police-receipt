@@ -71,6 +71,7 @@ export function ReceiptProvider({ children }) {
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
+  // คำนวณเลขใบเสร็จถัดไปจากรายการใบเสร็จที่มีอยู่จริงแบบไดนามิก
   const getNextReceiptNumber = useCallback(async () => {
     const latestReceipts = loadFromStorage(STORAGE_KEY, receipts);
     const latestSettings = loadFromStorage(SETTINGS_KEY, settings);
@@ -87,7 +88,7 @@ export function ReceiptProvider({ children }) {
       }
     });
 
-    const nextNo = Math.max(maxNumber + 1, latestSettings.nextReceiptNo || 1);
+    const nextNo = maxNumber + 1;
     const formatted = `${year}-${String(nextNo).padStart(5, '0')}`;
     return { number: nextNo, formatted, year };
   }, [receipts, settings]);
@@ -112,7 +113,7 @@ export function ReceiptProvider({ children }) {
         }
       });
 
-      const finalNumber = Math.max(maxNumber + 1, latestSettings.nextReceiptNo || 1);
+      const finalNumber = maxNumber + 1;
       const finalReceiptNo = `${year}-${String(finalNumber).padStart(5, '0')}`;
 
       const newReceipt = {
@@ -156,13 +157,32 @@ export function ReceiptProvider({ children }) {
     }
   }, [receipts, currentUser, settings]);
 
+  // ลบใบเสร็จพร้อมคำนวณและปรับลดเลขที่ใบเสร็จถัดไปให้อัตโนมัติ
   const deleteReceipt = useCallback((id) => {
     setReceipts(prev => {
       const updated = prev.filter(r => r.id !== id);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+
+      const year = settings.fiscalYear || FISCAL_YEAR;
+      let maxNumber = 0;
+      updated.forEach(r => {
+        if (r.receiptNo && r.receiptNo.startsWith(`${year}-`)) {
+          const parts = r.receiptNo.split('-');
+          const num = parseInt(parts[1], 10);
+          if (!isNaN(num) && num > maxNumber) maxNumber = num;
+        }
+      });
+
+      const recalculatedNextNo = maxNumber + 1;
+      setSettings(prevSettings => {
+        const updatedSettings = { ...prevSettings, nextReceiptNo: recalculatedNextNo };
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(updatedSettings));
+        return updatedSettings;
+      });
+
       return updated;
     });
-  }, []);
+  }, [settings]);
 
   const updateSettings = useCallback((newSettings) => {
     setSettings(prev => {
