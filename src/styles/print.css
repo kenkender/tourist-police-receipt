@@ -1,47 +1,53 @@
-/* Print CSS — สั่งพิมพ์ลงกระดาษ A4 1 หน้ากระดาษพอดีเป๊ะ */
+/* Print CSS — สั่งพิมพ์ลงกระดาษ A4 1 หน้ากระดาษพอดีเป๊ะ สีพื้นหลังขาวสะอาด */
 @media print {
   @page {
     size: A4 portrait;
     margin: 0;
   }
 
+  /* บังคับพื้นหลังของทุกคอนเทนเนอร์และ Modal ให้เป็นสีขาวบริสุทธิ์ */
+  html, body, #root, main, section, article, div, canvas, .modal-overlay, .modal-box, .app-container, .glass-card {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    background-image: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    animation: none !important;
+  }
+
   html, body {
     width: 210mm;
     height: 297mm;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-    color: #000000 !important;
     font-family: 'Sarabun', sans-serif !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     overflow: hidden !important;
   }
 
-  /* ซ่อนส่วนประกอบ UI อื่นๆ ทั้งหมดในหน้าเว็บ */
-  .no-print, nav, header, footer, .sidebar, button, .glass-card > div:first-child {
+  /* ซ่อนส่วนประกอบ UI อื่นๆ ปุ่มกด ป๊อปอัป และ Canvas ดาวลอย ทั้งหมด */
+  canvas, nav, header, footer, .no-print, button, .btn, svg:not(.receipt-print-wrapper svg) {
     display: none !important;
   }
 
-  /* ซ่อน background การ์ด */
-  .glass-card {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-
-  /* แสดงเฉพาะส่วนใบเสร็จ */
+  /* แสดงเฉพาะตัวใบเสร็จบนกระดาษ A4 */
   .receipt-print-wrapper {
+    display: block !important;
+    visibility: visible !important;
     width: 210mm !important;
     max-width: 210mm !important;
     padding: 8mm 10mm !important;
     margin: 0 auto !important;
     box-sizing: border-box !important;
+    background: #ffffff !important;
   }
 
-  /* ป้องกันไม่ให้ขึ้นหน้าใหม่ */
+  /* ป้องกันการตัดขึ้นหน้าใหม่ */
   * {
     page-break-inside: avoid !important;
     page-break-before: avoid !important;
