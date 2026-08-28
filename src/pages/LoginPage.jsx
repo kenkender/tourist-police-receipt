@@ -3,16 +3,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import ParticleBackground from '../components/three/ParticleBackground';
 import { PoliceEmblem } from '../components/layout/Navbar';
-import { Eye, EyeOff, LogIn, Shield } from 'lucide-react';
+import { Shield } from 'lucide-react';
 import { GOOGLE_CONFIG, LINE_CONFIG } from '../config/google.config';
 
 export default function LoginPage() {
-  const { loginWithCredentials, loginWithGoogle, loginWithLine } = useAuth();
+  const { loginWithGoogle, loginWithLine } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [role, setRole] = useState('issuer');
-  const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -35,20 +32,6 @@ export default function LoginPage() {
       document.head.appendChild(script);
     }
   }, []);
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
-    try {
-      await loginWithCredentials(email, password, role);
-      navigate('/dashboard');
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Google Sign-In Handler
   const handleGoogleLogin = async () => {
@@ -193,7 +176,7 @@ export default function LoginPage() {
         </div>
 
         {/* Role Selector */}
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 20 }}>
           <label className="form-label" style={{ fontSize: 11, color: '#a8b5cc' }}>
             สิทธิ์การใช้งานที่ต้องการเข้าถึง
           </label>
@@ -201,7 +184,7 @@ export default function LoginPage() {
             value={role}
             onChange={e => setRole(e.target.value)}
             className="form-select"
-            style={{ fontSize: 12, padding: '8px 12px' }}
+            style={{ fontSize: 13, padding: '10px 12px' }}
           >
             <option value="issuer">ผู้ออกใบเสร็จ (Officer / Issuer)</option>
             <option value="auditor">ผู้ตรวจสอบ (Auditor)</option>
@@ -209,8 +192,26 @@ export default function LoginPage() {
           </select>
         </div>
 
+        {/* Error Notification */}
+        {error && (
+          <div style={{
+            padding: '12px 14px',
+            marginBottom: 16,
+            background: 'rgba(239,68,68,0.15)',
+            border: '1px solid rgba(239,68,68,0.3)',
+            borderRadius: 10,
+            color: '#fca5a5',
+            fontSize: 12,
+            display: 'flex', alignItems: 'flex-start', gap: 8,
+            lineHeight: 1.4,
+          }}>
+            <Shield size={14} style={{ marginTop: 2, flexShrink: 0 }} />
+            <div>{error}</div>
+          </div>
+        )}
+
         {/* Social Login Buttons Section */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 12 }}>
           {/* Google Sign In Button */}
           <button
             type="button"
@@ -218,7 +219,7 @@ export default function LoginPage() {
             disabled={loading}
             style={{
               width: '100%',
-              padding: '11px 16px',
+              padding: '12px 16px',
               borderRadius: 10,
               border: '1px solid rgba(255,255,255,0.2)',
               background: '#ffffff',
@@ -252,7 +253,7 @@ export default function LoginPage() {
             disabled={loading}
             style={{
               width: '100%',
-              padding: '11px 16px',
+              padding: '12px 16px',
               borderRadius: 10,
               border: 'none',
               background: '#06C755',
@@ -277,103 +278,8 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {/* Divider */}
         <div style={{
-          display: 'flex', alignItems: 'center', margin: '16px 0',
-          color: '#6b7a99', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em'
-        }}>
-          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
-          <span style={{ padding: '0 12px' }}>หรือล็อกอินด้วยอีเมล</span>
-          <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
-        </div>
-
-        {/* Login Form */}
-        <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div className="form-group">
-            <label className="form-label" style={{ fontSize: 11 }}>อีเมลผู้ใช้งาน</label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="form-input"
-              placeholder="name@touristpolice.go.th"
-              required
-              autoComplete="email"
-              style={{ fontSize: 13, padding: '9px 12px' }}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" style={{ fontSize: 11 }}>รหัสผ่าน</label>
-            <div style={{ position: 'relative' }}>
-              <input
-                type={showPass ? 'text' : 'password'}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="form-input"
-                placeholder="••••••••"
-                required
-                style={{ paddingRight: 44, fontSize: 13, padding: '9px 12px' }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPass(v => !v)}
-                style={{
-                  position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                  background: 'none', border: 'none', cursor: 'pointer', color: '#6b7a99',
-                  display: 'flex', alignItems: 'center',
-                }}
-              >
-                {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </div>
-
-          {error && (
-            <div style={{
-              padding: '10px 14px',
-              background: 'rgba(239,68,68,0.15)',
-              border: '1px solid rgba(239,68,68,0.3)',
-              borderRadius: 10,
-              color: '#fca5a5',
-              fontSize: 12,
-              display: 'flex', alignItems: 'flex-start', gap: 8,
-              lineHeight: 1.4,
-            }}>
-              <Shield size={14} style={{ marginTop: 2, flexShrink: 0 }} />
-              <div>{error}</div>
-            </div>
-          )}
-
-          <button
-            type="submit"
-            className="btn btn-gold"
-            disabled={loading}
-            style={{ marginTop: 4, justifyContent: 'center', padding: '11px 16px', fontSize: 14 }}
-          >
-            {loading ? (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{
-                  width: 16, height: 16,
-                  border: '2px solid rgba(15,31,61,0.3)',
-                  borderTopColor: 'var(--navy-900)',
-                  borderRadius: '50%',
-                  animation: 'spin-slow 0.8s linear infinite',
-                  display: 'inline-block',
-                }} />
-                กำลังเข้าสู่ระบบ...
-              </span>
-            ) : (
-              <>
-                <LogIn size={18} />
-                เข้าสู่ระบบ
-              </>
-            )}
-          </button>
-        </form>
-
-        <div style={{
-          marginTop: 20, textAlign: 'center',
+          marginTop: 24, textAlign: 'center',
           fontSize: 11, color: '#4b5a75',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
         }}>
