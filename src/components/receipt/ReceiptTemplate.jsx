@@ -151,10 +151,8 @@ function ReceiptCopy({ data, copyType }) {
           </div>
           <div style={{
             height: 36, borderBottom: '1px solid #94a3b8',
-            marginBottom: 2, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <span style={{ color: '#cbd5e1', fontSize: 11, fontStyle: 'italic' }}>( ลายมือชื่อ )</span>
-          </div>
+            marginBottom: 2,
+          }} />
           <div style={{ fontSize: 12, fontWeight: 600 }}>
             ({signerRank ? `${signerRank} ` : ''}{signerName || '—'})
           </div>
