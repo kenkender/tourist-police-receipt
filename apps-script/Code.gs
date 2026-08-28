@@ -1,5 +1,5 @@
 /**
- * Google Apps Script — ระบบล็อกเลขใบเสร็จ (Atomic Counter)
+ * Google Apps Script — ระบบออกใบเสร็จรับเงิน & ตรวจสอบสิทธิ์ผู้ใช้
  * กองทุนสวัสดิการ กองบัญชาการตำรวจท่องเที่ยว
  *
  * วิธีใช้:
@@ -15,9 +15,10 @@
 const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE'; // ← แก้ตรงนี้!
 const COUNTER_SHEET = 'counter';
 const RECEIPTS_SHEET = 'receipts';
+const USERS_SHEET = 'users';
 
 /**
- * GET request — ขอเลขใบเสร็จถัดไป (Thread-safe ด้วย LockService)
+ * GET request — ประมวลผลคำขอ GET
  */
 function doGet(e) {
   const headers = {
@@ -36,6 +37,10 @@ function doGet(e) {
       return getAllReceipts(headers);
     }
 
+    if (action === 'getUserRole') {
+      return getUserRole(e.parameter.email, headers);
+    }
+
     return response({ success: false, error: 'Unknown action' }, headers);
   } catch (err) {
     return response({ success: false, error: err.message }, headers);
@@ -43,7 +48,7 @@ function doGet(e) {
 }
 
 /**
- * POST request — บันทึกใบเสร็จลง Sheets
+ * POST request — บันทึกข้อมูล
  */
 function doPost(e) {
   const headers = {
@@ -66,6 +71,51 @@ function doPost(e) {
 }
 
 /**
+ * ตรวจสอบสิทธิ์การใช้งานจากแผ่นงาน users ใน Google Sheets
+ */
+function getUserRole(email, headers) {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    let sheet = ss.getSheetByName(USERS_SHEET);
+
+    if (!sheet) {
+      sheet = initUsersSheet(ss);
+    }
+
+    const cleanEmail = (email || '').toLowerCase().trim();
+    if (!cleanEmail) {
+      return response({ success: true, role: 'issuer', name: 'เจ้าหน้าที่' }, headers);
+    }
+
+    const data = sheet.getDataRange().getValues();
+
+    // ค้นหาอีเมลในตาราง users (คอลัมน์ 1 = email, คอลัมน์ 2 = role, คอลัมน์ 3 = name)
+    for (let i = 1; i < data.length; i++) {
+      const userEmail = String(data[i][0]).toLowerCase().trim();
+      if (userEmail === cleanEmail) {
+        return response({
+          success: true,
+          email: cleanEmail,
+          role: String(data[i][1] || 'issuer').toLowerCase().trim(),
+          name: data[i][2] || cleanEmail.split('@')[0],
+        }, headers);
+      }
+    }
+
+    // หากไม่อยู่ในตาราง ให้สิทธิ์เริ่มต้นเป็น issuer (ผู้ออกใบเสร็จ)
+    return response({
+      success: true,
+      email: cleanEmail,
+      role: 'issuer',
+      name: cleanEmail.split('@')[0],
+    }, headers);
+
+  } catch (err) {
+    return response({ success: false, error: err.message, role: 'issuer' }, headers);
+  }
+}
+
+/**
  * ขอเลขใบเสร็จถัดไป — ใช้ LockService เพื่อป้องกัน Race Condition
  */
 function getNextReceiptNumber(e, headers) {
@@ -81,7 +131,6 @@ function getNextReceiptNumber(e, headers) {
     const sheet = ss.getSheetByName(COUNTER_SHEET);
 
     if (!sheet) {
-      // สร้าง counter sheet ถ้ายังไม่มี
       initCounterSheet(ss);
       return getNextReceiptNumber(e, headers);
     }
@@ -89,11 +138,10 @@ function getNextReceiptNumber(e, headers) {
     const fiscalYear = e.parameter.year || getFiscalYear();
     const data = sheet.getDataRange().getValues();
 
-    // หา row ของปีงบประมาณนี้
     let rowIndex = -1;
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][0]) === String(fiscalYear)) {
-        rowIndex = i + 1; // 1-indexed
+        rowIndex = i + 1;
         break;
       }
     }
@@ -101,7 +149,6 @@ function getNextReceiptNumber(e, headers) {
     let lastNumber = 0;
 
     if (rowIndex === -1) {
-      // เพิ่ม row ใหม่สำหรับปีนี้
       sheet.appendRow([fiscalYear, 1, new Date()]);
       lastNumber = 1;
     } else {
@@ -137,7 +184,6 @@ function saveReceipt(data, headers) {
       return saveReceipt(data, headers);
     }
 
-    // ตรวจสอบว่าเลขซ้ำหรือไม่
     const existing = sheet.getDataRange().getValues();
     for (let i = 1; i < existing.length; i++) {
       if (String(existing[i][0]) === String(data.receiptNo) &&
@@ -179,7 +225,7 @@ function getAllReceipts(headers) {
     if (!sheet) return response({ success: true, data: [] }, headers);
 
     const data = sheet.getDataRange().getValues();
-    const keys = data[0]; // header row
+    const keys = data[0];
     const receipts = [];
 
     for (let i = 1; i < data.length; i++) {
@@ -192,6 +238,17 @@ function getAllReceipts(headers) {
   } catch (err) {
     return response({ success: false, error: err.message }, headers);
   }
+}
+
+/**
+ * สร้าง Users Sheet เริ่มต้น
+ */
+function initUsersSheet(ss) {
+  const sheet = ss.insertSheet(USERS_SHEET);
+  const headers = ['email', 'role', 'name'];
+  sheet.getRange(1, 1, 1, 3).setValues([headers]);
+  sheet.getRange(1, 1, 1, 3).setFontWeight('bold').setBackground('#1e3a8a').setFontColor('#ffffff');
+  return sheet;
 }
 
 /**

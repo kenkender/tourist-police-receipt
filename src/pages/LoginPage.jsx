@@ -9,7 +9,6 @@ import { GOOGLE_CONFIG, LINE_CONFIG } from '../config/google.config';
 export default function LoginPage() {
   const { loginWithGoogle, loginWithLine } = useAuth();
   const navigate = useNavigate();
-  const [role, setRole] = useState('issuer');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -58,7 +57,6 @@ export default function LoginPage() {
                   email: userInfo.email,
                   name: userInfo.name,
                   picture: userInfo.picture,
-                  role: role,
                 });
                 navigate('/dashboard');
               } catch (err) {
@@ -100,7 +98,6 @@ export default function LoginPage() {
             userId: profile.userId,
             displayName: profile.displayName,
             pictureUrl: profile.pictureUrl,
-            role: role,
           });
           navigate('/dashboard');
         }
@@ -158,7 +155,7 @@ export default function LoginPage() {
         }} />
 
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+        <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{
             display: 'inline-block',
             animation: 'float 4s ease-in-out infinite',
@@ -173,23 +170,6 @@ export default function LoginPage() {
           <p style={{ fontSize: 12, color: '#c9a84c', fontWeight: 500 }}>
             กองทุนสวัสดิการ กองบัญชาการตำรวจท่องเที่ยว
           </p>
-        </div>
-
-        {/* Role Selector */}
-        <div style={{ marginBottom: 20 }}>
-          <label className="form-label" style={{ fontSize: 11, color: '#a8b5cc' }}>
-            สิทธิ์การใช้งานที่ต้องการเข้าถึง
-          </label>
-          <select
-            value={role}
-            onChange={e => setRole(e.target.value)}
-            className="form-select"
-            style={{ fontSize: 13, padding: '10px 12px' }}
-          >
-            <option value="issuer">ผู้ออกใบเสร็จ (Officer / Issuer)</option>
-            <option value="admin">ผู้ดูแลระบบ (System Admin)</option>
-          </select>
-
         </div>
 
         {/* Error Notification */}

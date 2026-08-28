@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { GOOGLE_CONFIG } from '../config/google.config';
 
 const AuthContext = createContext(null);
+const APPS_SCRIPT_URL = import.meta.env.VITE_APPS_SCRIPT_URL || '';
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
@@ -22,33 +23,49 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Login ด้วย Email + Password
-  const loginWithCredentials = useCallback(async (email, password, role = 'issuer') => {
-    setError(null);
-    const cleanEmail = (email || '').trim();
-    if (!cleanEmail) {
-      throw new Error('กรุณากรอกอีเมลผู้ใช้งาน');
+  // Helper สำหรับเช็กสิทธิ์จาก Google Sheets หรือ Admin Email List
+  const fetchUserRoleFromSheets = async (email) => {
+    const cleanEmail = (email || '').toLowerCase().trim();
+
+    // 1. เช็กเบื้องต้นจาก VITE_ADMIN_EMAILS ใน Environment Variables (ถ้ามี)
+    const adminEmailsEnv = import.meta.env.VITE_ADMIN_EMAILS || '';
+    if (adminEmailsEnv) {
+      const adminList = adminEmailsEnv.split(',').map(e => e.toLowerCase().trim());
+      if (adminList.includes(cleanEmail)) {
+        return { role: 'admin', name: cleanEmail.split('@')[0] };
+      }
     }
-    const userData = {
-      email: cleanEmail,
-      name: cleanEmail.split('@')[0],
-      role: role,
-      provider: 'email',
-      loginTime: new Date().toISOString(),
-    };
-    setCurrentUser(userData);
-    sessionStorage.setItem('tp_current_user', JSON.stringify(userData));
-    return userData;
-  }, []);
+
+    // 2. เช็กจากตาราง users ใน Google Sheets ผ่าน Apps Script API
+    if (APPS_SCRIPT_URL && cleanEmail) {
+      try {
+        const res = await fetch(`${APPS_SCRIPT_URL}?action=getUserRole&email=${encodeURIComponent(cleanEmail)}`);
+        const result = await res.json();
+        if (result && result.success) {
+          return {
+            role: result.role || 'issuer',
+            name: result.name || cleanEmail.split('@')[0],
+          };
+        }
+      } catch (err) {
+        console.warn('Could not query user role from Sheets:', err.message);
+      }
+    }
+
+    // ค่าเริ่มต้นถ้าไม่พบในตาราง
+    return { role: 'issuer', name: cleanEmail.split('@')[0] };
+  };
 
   // Login ด้วย Google Account
   const loginWithGoogle = useCallback(async (googleUser) => {
     setError(null);
+    const { role: resolvedRole, name: resolvedName } = await fetchUserRoleFromSheets(googleUser.email);
+
     const userData = {
       email: googleUser.email,
-      name: googleUser.name || googleUser.email.split('@')[0],
+      name: googleUser.name || resolvedName || googleUser.email.split('@')[0],
       picture: googleUser.picture || null,
-      role: googleUser.role || 'issuer',
+      role: resolvedRole,
       provider: 'google',
       loginTime: new Date().toISOString(),
     };
@@ -60,12 +77,15 @@ export function AuthProvider({ children }) {
   // Login ด้วย LINE Profile
   const loginWithLine = useCallback(async (lineUser) => {
     setError(null);
+    const userEmail = lineUser.email || `${lineUser.userId.substring(0, 8)}@line.me`;
+    const { role: resolvedRole } = await fetchUserRoleFromSheets(userEmail);
+
     const userData = {
-      email: lineUser.email || `${lineUser.userId.substring(0, 8)}@line.me`,
+      email: userEmail,
       name: lineUser.displayName || 'ผู้ใช้ LINE',
       picture: lineUser.pictureUrl || null,
       lineUserId: lineUser.userId,
-      role: lineUser.role || 'issuer',
+      role: resolvedRole,
       provider: 'line',
       loginTime: new Date().toISOString(),
     };
@@ -100,7 +120,6 @@ export function AuthProvider({ children }) {
     currentUser,
     loading,
     error,
-    loginWithCredentials,
     loginWithGoogle,
     loginWithLine,
     logout,
