@@ -187,9 +187,9 @@ export default function LoginPage() {
             style={{ fontSize: 13, padding: '10px 12px' }}
           >
             <option value="issuer">ผู้ออกใบเสร็จ (Officer / Issuer)</option>
-            <option value="auditor">ผู้ตรวจสอบ (Auditor)</option>
             <option value="admin">ผู้ดูแลระบบ (System Admin)</option>
           </select>
+
         </div>
 
         {/* Error Notification */}
