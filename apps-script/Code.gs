@@ -1,18 +1,9 @@
 /**
  * Google Apps Script — ระบบออกใบเสร็จรับเงิน & ตรวจสอบสิทธิ์ผู้ใช้
  * กองทุนสวัสดิการ กองบัญชาการตำรวจท่องเที่ยว
- *
- * วิธีใช้:
- * 1. เปิด script.google.com สร้าง Project ใหม่
- * 2. วาง Code นี้ลงไป
- * 3. แก้ SPREADSHEET_ID ให้ตรงกับ Sheet ของคุณ
- * 4. Deploy > New Deployment > Web App
- *    - Execute as: Me
- *    - Who has access: Anyone
- * 5. Copy URL ที่ได้ไปใส่ใน .env ของโปรเจค
  */
 
-const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE'; // ← แก้ตรงนี้!
+const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE'; // ← ใส่ Spreadsheet ID ของคุณตรงนี้!
 const COUNTER_SHEET = 'counter';
 const RECEIPTS_SHEET = 'receipts';
 const USERS_SHEET = 'users';
@@ -27,7 +18,7 @@ function doGet(e) {
   };
 
   try {
-    const action = e.parameter.action || 'nextNumber';
+    const action = e ? e.parameter.action : 'nextNumber';
 
     if (action === 'nextNumber') {
       return getNextReceiptNumber(e, headers);
@@ -38,7 +29,9 @@ function doGet(e) {
     }
 
     if (action === 'getUserRole') {
-      return getUserRole(e.parameter.email, headers);
+      const email = e ? e.parameter.email : '';
+      const name = e ? e.parameter.name : '';
+      return getUserRole(email, name, headers);
     }
 
     return response({ success: false, error: 'Unknown action' }, headers);
@@ -71,9 +64,9 @@ function doPost(e) {
 }
 
 /**
- * ตรวจสอบสิทธิ์การใช้งานจากแผ่นงาน users ใน Google Sheets
+ * ตรวจสอบสิทธิ์การใช้งานจากแผ่นงาน users ใน Google Sheets (แมทช์ได้ทั้ง Email และ ชื่อ)
  */
-function getUserRole(email, headers) {
+function getUserRole(email, name, headers) {
   try {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     let sheet = ss.getSheetByName(USERS_SHEET);
@@ -83,21 +76,25 @@ function getUserRole(email, headers) {
     }
 
     const cleanEmail = (email || '').toLowerCase().trim();
-    if (!cleanEmail) {
-      return response({ success: true, role: 'issuer', name: 'เจ้าหน้าที่' }, headers);
-    }
+    const cleanName = (name || '').toLowerCase().trim();
 
     const data = sheet.getDataRange().getValues();
 
-    // ค้นหาอีเมลในตาราง users (คอลัมน์ 1 = email, คอลัมน์ 2 = role, คอลัมน์ 3 = name)
+    // ค้นหาทั้งในคอลัมน์ A (email) และคอลัมน์ C (name)
     for (let i = 1; i < data.length; i++) {
-      const userEmail = String(data[i][0]).toLowerCase().trim();
-      if (userEmail === cleanEmail) {
+      const rowEmail = String(data[i][0] || '').toLowerCase().trim();
+      const rowRole = String(data[i][1] || 'issuer').toLowerCase().trim();
+      const rowName = String(data[i][2] || '').toLowerCase().trim();
+
+      const isMatch = (cleanEmail && (rowEmail === cleanEmail || rowName === cleanEmail)) ||
+                      (cleanName && (rowEmail === cleanName || rowName === cleanName));
+
+      if (isMatch) {
         return response({
           success: true,
           email: cleanEmail,
-          role: String(data[i][1] || 'issuer').toLowerCase().trim(),
-          name: data[i][2] || cleanEmail.split('@')[0],
+          role: rowRole,
+          name: data[i][2] || cleanName || cleanEmail.split('@')[0],
         }, headers);
       }
     }
@@ -107,7 +104,7 @@ function getUserRole(email, headers) {
       success: true,
       email: cleanEmail,
       role: 'issuer',
-      name: cleanEmail.split('@')[0],
+      name: cleanName || cleanEmail.split('@')[0],
     }, headers);
 
   } catch (err) {
@@ -120,7 +117,7 @@ function getUserRole(email, headers) {
  */
 function getNextReceiptNumber(e, headers) {
   const lock = LockService.getScriptLock();
-  const acquired = lock.tryLock(10000); // รอสูงสุด 10 วินาที
+  const acquired = lock.tryLock(10000);
 
   if (!acquired) {
     return response({ success: false, error: 'ระบบกำลังประมวลผล กรุณาลองใหม่' }, headers);
@@ -135,7 +132,7 @@ function getNextReceiptNumber(e, headers) {
       return getNextReceiptNumber(e, headers);
     }
 
-    const fiscalYear = e.parameter.year || getFiscalYear();
+    const fiscalYear = (e && e.parameter && e.parameter.year) ? e.parameter.year : getFiscalYear();
     const data = sheet.getDataRange().getValues();
 
     let rowIndex = -1;
