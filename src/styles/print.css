@@ -1,27 +1,18 @@
-/* Print CSS — สั่งพิมพ์ลงกระดาษ A4 สีพื้นหลังขาวสะอาด 100% ไม่มีสีเทา/มืด */
+/* Print CSS — สั่งพิมพ์ลงกระดาษ A4 สีขาวสะอาด 100% ไม่มีแถบสีน้ำเงิน/สีเทา */
 @media print {
   @page {
     size: A4 portrait;
     margin: 0;
   }
 
-  /* บังคับทุกชิ้นส่วนในเว็บให้พื้นหลังเป็นสีขาวบริสุทธิ์ 100% */
-  *, *::before, *::after {
-    background: #ffffff !important;
-    background-color: #ffffff !important;
-    background-image: none !important;
-    box-shadow: none !important;
-    filter: none !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-  }
-
+  /* 1. รีเซ็ตหน้ากระดาษ */
   html, body, #root {
     width: 210mm !important;
     height: 297mm !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
+    background-color: #ffffff !important;
     color: #000000 !important;
     font-family: 'Sarabun', sans-serif !important;
     -webkit-print-color-adjust: exact !important;
@@ -29,13 +20,34 @@
     overflow: hidden !important;
   }
 
-  /* ซ่อนส่วนประกอบ UI อื่นๆ ปุ่มกด และส่วนเกินทั้งหมด */
+  /* 2. ล้างพื้นหลัง เงา และขอบของทุก Container ภายนอกทั้งหมด */
+  *, *::before, *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* ถอดขอบและสีพื้นหลังของ Modal / Glass-card / Container ทุกประเภท */
+  html, body, #root, main, section, article, div, canvas,
+  .modal-overlay, .modal-box, .glass-card, .app-container,
+  #modal-receipt-area, #receipt-pdf-area {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    border: none !important;
+    border-radius: 0 !important;
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  /* 3. ซ่อนส่วนประกอบ UI อื่นๆ ปุ่มกด ป๊อปอัป และ Canvas */
   canvas, nav, header, footer, .no-print, button, .btn,
   .modal-header, .modal-footer, svg:not(.receipt-print-wrapper svg) {
     display: none !important;
   }
 
-  /* ถอดกรอบ Modal และ Overlay ออกในการพิมพ์ */
+  /* 4. ถอดกรอบ Modal ป้องกันแถบเลื่อน (Scrollbar) และขอบน้ำเงินขวา */
   .modal-overlay, .modal-box {
     position: static !important;
     inset: auto !important;
@@ -45,12 +57,12 @@
     padding: 0 !important;
     margin: 0 !important;
     border: none !important;
-    border-radius: 0 !important;
+    outline: none !important;
     background: #ffffff !important;
     overflow: visible !important;
   }
 
-  /* แสดงเฉพาะส่วนใบเสร็จอยู่กึ่งกลางกระดาษ A4 */
+  /* 5. จัดวางเฉพาะตัวใบเสร็จรับเงินให้อยู่กึ่งกลางกระดาษ A4 */
   .receipt-print-wrapper {
     display: block !important;
     visibility: visible !important;
@@ -60,6 +72,12 @@
     margin: 0 auto !important;
     box-sizing: border-box !important;
     background: #ffffff !important;
+    border: none !important;
+  }
+
+  /* 6. คืนขอบตารางและกรอบใบเสร็จเฉพาะภายใน .receipt-print-wrapper เท่านั้น */
+  .receipt-print-wrapper * {
+    border-color: currentColor !important;
   }
 
   /* ป้องกันการตัดขึ้นหน้าใหม่ */
