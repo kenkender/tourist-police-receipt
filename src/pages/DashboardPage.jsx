@@ -7,8 +7,9 @@ import {
 } from 'recharts';
 import {
   TrendingUp, FileText, Users, ArrowUpRight, Calendar,
-  DollarSign, Activity,
+  DollarSign, Activity, Table, ExternalLink,
 } from 'lucide-react';
+import { getGoogleSheetUrl } from '../config/google.config';
 
 function StatCard({ title, value, sub, icon: Icon, color = '#c9a84c', trend }) {
   return (
@@ -67,8 +68,10 @@ function CustomTooltip({ active, payload, label }) {
 }
 
 export default function DashboardPage() {
-  const { receipts, stats, getDailySummaries } = useReceipts();
+  const { receipts, settings, stats, getDailySummaries } = useReceipts();
   const dashRef = useRef(null);
+
+  const sheetUrl = getGoogleSheetUrl(settings?.spreadsheetUrl);
 
   const s = stats();
   const dailyData = getDailySummaries().slice(0, 14).reverse().map(d => ({
@@ -96,6 +99,24 @@ export default function DashboardPage() {
             ภาพรวมการรับเงินและใบเสร็จทั้งหมดในระบบ
           </p>
         </div>
+
+        <a
+          href={sheetUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-success"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '10px 20px', fontSize: 14, fontWeight: 700,
+            textDecoration: 'none', borderRadius: 12,
+            boxShadow: '0 4px 16px rgba(16,185,129,0.25)',
+          }}
+          title="เปิดไปยังตารางข้อมูล Google Sheets"
+        >
+          <Table size={18} />
+          เปิดดู Google Sheets
+          <ExternalLink size={14} />
+        </a>
       </div>
 
       {/* Main Dashboard Content */}

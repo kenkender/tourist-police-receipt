@@ -3,14 +3,16 @@ import { useReceipts } from '../contexts/ReceiptContext';
 import { useAuth } from '../contexts/AuthContext';
 import { formatBaht, toThaiDateShort } from '../services/utils';
 import ReceiptTemplate from '../components/receipt/ReceiptTemplate';
+import { getGoogleSheetUrl } from '../config/google.config';
 import {
   BookOpen, Search, RotateCcw, Printer,
-  Trash2, Eye, ChevronLeft, ChevronRight, X,
+  Trash2, Eye, ChevronLeft, ChevronRight, X, Table, ExternalLink,
 } from 'lucide-react';
 
 export default function ReceiptListPage() {
-  const { receipts, deleteReceipt } = useReceipts();
+  const { receipts, settings, deleteReceipt } = useReceipts();
   const { isAdmin } = useAuth();
+  const sheetUrl = getGoogleSheetUrl(settings?.spreadsheetUrl);
 
   const [search, setSearch] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -60,6 +62,23 @@ export default function ReceiptListPage() {
             ค้นหา ตรวจสอบข้อมูลผู้บริจาค และสั่งพิมพ์ใบเสร็จซ้ำได้
           </p>
         </div>
+        <a
+          href={sheetUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn btn-success"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '9px 18px', fontSize: 13, fontWeight: 700,
+            textDecoration: 'none', borderRadius: 10,
+            boxShadow: '0 4px 14px rgba(16,185,129,0.2)',
+          }}
+          title="เปิดไปยังตารางข้อมูล Google Sheets"
+        >
+          <Table size={16} />
+          เปิดดู Google Sheets
+          <ExternalLink size={13} />
+        </a>
       </div>
 
       {/* Filters */}

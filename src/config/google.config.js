@@ -11,6 +11,9 @@ export const GOOGLE_CONFIG = {
   // Google Spreadsheet ID (จาก URL ของ Sheet)
   SPREADSHEET_ID: import.meta.env.VITE_SPREADSHEET_ID || '',
 
+  // Google Spreadsheet Direct URL
+  SPREADSHEET_URL: import.meta.env.VITE_SPREADSHEET_URL || '',
+
   // Google Apps Script Web App URL (สำหรับ Lock เลขใบเสร็จ)
   APPS_SCRIPT_URL: import.meta.env.VITE_APPS_SCRIPT_URL || '',
 
@@ -22,6 +25,15 @@ export const GOOGLE_CONFIG = {
 
   // Discovery Doc
   DISCOVERY_DOC: 'https://sheets.googleapis.com/$discovery/rest?version=v4',
+};
+
+export const getGoogleSheetUrl = (customUrl) => {
+  if (customUrl && customUrl.trim()) return customUrl.trim();
+  if (GOOGLE_CONFIG.SPREADSHEET_URL) return GOOGLE_CONFIG.SPREADSHEET_URL;
+  if (GOOGLE_CONFIG.SPREADSHEET_ID) {
+    return `https://docs.google.com/spreadsheets/d/${GOOGLE_CONFIG.SPREADSHEET_ID}/edit`;
+  }
+  return 'https://docs.google.com/spreadsheets';
 };
 
 // LINE Login Configuration

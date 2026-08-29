@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useReceipts } from '../contexts/ReceiptContext';
 import { useAuth } from '../contexts/AuthContext';
 import { FISCAL_YEAR, ORG_INFO } from '../config/google.config';
-import { Settings, Shield, BookOpen, Hash, User, Save, Plus, Trash2, CheckCircle2, UserCheck } from 'lucide-react';
+import { Settings, Shield, BookOpen, Hash, User, Save, Plus, Trash2, CheckCircle2, UserCheck, Table } from 'lucide-react';
 
 function FormField({ label, icon: Icon, children, hint }) {
   return (
@@ -27,6 +27,7 @@ export default function SettingsPage() {
     signerRank: settings.signerRank || ORG_INFO.defaultSigner.rank,
     signerPosition: settings.signerPosition || ORG_INFO.defaultSigner.position,
     fiscalYear: settings.fiscalYear || FISCAL_YEAR,
+    spreadsheetUrl: settings.spreadsheetUrl || '',
   });
 
   // ฟอร์มเพิ่มเจ้าหน้าที่ผู้รับเงินใหม่
@@ -51,6 +52,7 @@ export default function SettingsPage() {
       signerRank: form.signerRank,
       signerPosition: form.signerPosition,
       fiscalYear: form.fiscalYear,
+      spreadsheetUrl: form.spreadsheetUrl,
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -78,7 +80,7 @@ export default function SettingsPage() {
           ตั้งค่าระบบ
         </h2>
         <p style={{ fontSize: 12, color: '#6b7a99', marginTop: 4 }}>
-          ตั้งค่าพารามิเตอร์ระบบ เลขเล่ม และจัดการรายชื่อเจ้าหน้าที่ผู้รับเงิน (ลงนาม)
+          ตั้งค่าพารามิเตอร์ระบบ เลขเล่ม ลิงก์ Google Sheets และจัดการรายชื่อเจ้าหน้าที่ผู้รับเงิน (ลงนาม)
         </p>
       </div>
 
@@ -87,9 +89,9 @@ export default function SettingsPage() {
         <div className="glass-card" style={{ padding: '24px 28px' }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: '#c9a84c', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
             <Hash size={15} />
-            ตั้งค่าเลขใบเสร็จ
+            ตั้งค่าเลขใบเสร็จ & Google Sheets
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
             <FormField label="เลขเล่มเริ่มต้น" icon={BookOpen}
               hint="เลขเล่มที่จะใช้ค่าเริ่มต้นสำหรับใบเสร็จใหม่">
               <input
@@ -119,6 +121,16 @@ export default function SettingsPage() {
               />
             </FormField>
           </div>
+
+          <FormField label="ลิงก์ Google Sheets (Spreadsheet URL)" icon={Table}
+            hint="วาง URL ของ Google Sheets เพื่อให้ปุ่ม 'เปิดดู Google Sheets' เปิดไปยังตารางข้อมูลของคุณได้โดยตรง">
+            <input
+              className="form-input"
+              placeholder="https://docs.google.com/spreadsheets/d/your-sheet-id/edit"
+              value={form.spreadsheetUrl}
+              onChange={e => setForm(f => ({ ...f, spreadsheetUrl: e.target.value }))}
+            />
+          </FormField>
 
           <div style={{
             marginTop: 16, padding: '12px 16px',
