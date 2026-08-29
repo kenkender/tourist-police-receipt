@@ -190,7 +190,7 @@ export default function UserManualModal({ isOpen, onClose }) {
             marginTop: 32, borderTop: '1px solid #e2e8f0', paddingTop: 16,
             display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b',
           }}>
-            <div>จัดทำโดย: กองทุนสวัสดิการ กองบัญชาการตำรวจท่องเที่ยว</div>
+            <div>จัดทำโดย: ส.ต.อ.อดิศร สดชื่น ผบ.หมู่ ฝอ.6 บก.อก.บช.ทท.</div>
             <div>ฉบับอัปเดตล่าสุด: ปีงบประมาณ 2569</div>
           </div>
         </div>
