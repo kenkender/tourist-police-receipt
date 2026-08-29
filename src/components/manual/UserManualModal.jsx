@@ -1,13 +1,9 @@
 import React from 'react';
-import { BookOpen, Printer, X, CheckCircle, Shield, FileText, UserCheck, RefreshCw, Key } from 'lucide-react';
+import { BookOpen, X, CheckCircle, Shield, FileText, UserCheck, RefreshCw, Key } from 'lucide-react';
 import { PoliceEmblem } from '../layout/Navbar';
 
 export default function UserManualModal({ isOpen, onClose }) {
   if (!isOpen) return null;
-
-  const handlePrintManual = () => {
-    window.print();
-  };
 
   return (
     <div className="modal-overlay" style={{
@@ -38,10 +34,7 @@ export default function UserManualModal({ isOpen, onClose }) {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <button className="btn btn-gold" onClick={handlePrintManual}>
-              <Printer size={16} /> สั่งพิมพ์ / บันทึกคู่มือเป็น PDF
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={onClose}>
+            <button className="btn btn-ghost btn-sm" onClick={onClose} title="ปิดคู่มือ">
               <X size={20} />
             </button>
           </div>
