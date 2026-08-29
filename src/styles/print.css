@@ -32,12 +32,12 @@
     visibility: visible !important;
   }
 
-  /* 4. จัดตำแหน่งตัวใบเสร็จให้อยู่กึ่งกลางกระดาษ A4 */
+  /* 4. จัดตำแหน่งตัวใบเสร็จให้อยู่กึ่งกลางกระดาษ A4 ทั้งแกน X และ Y */
   .receipt-print-wrapper {
     position: absolute !important;
     left: 0 !important;
     right: 0 !important;
-    top: 0 !important;
+    top: 8mm !important; /* ขยับเว้นระยะห่างลงมาจากข้อความหัวกระดาษ (Header) ทั้งแกน X และ Y เท่าๆ กัน */
     margin: 0 auto !important;
     width: 190mm !important;
     max-width: 190mm !important;
