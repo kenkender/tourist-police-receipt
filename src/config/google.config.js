@@ -9,10 +9,10 @@ export const GOOGLE_CONFIG = {
   API_KEY: import.meta.env.VITE_GOOGLE_API_KEY || '',
 
   // Google Spreadsheet ID (จาก URL ของ Sheet)
-  SPREADSHEET_ID: import.meta.env.VITE_SPREADSHEET_ID || '',
+  SPREADSHEET_ID: import.meta.env.VITE_SPREADSHEET_ID || '1vqpnYo_Opcwi2rpMeieAoFjni5PBkAO4J-Yqeamt8Fc',
 
   // Google Spreadsheet Direct URL
-  SPREADSHEET_URL: import.meta.env.VITE_SPREADSHEET_URL || '',
+  SPREADSHEET_URL: import.meta.env.VITE_SPREADSHEET_URL || 'https://docs.google.com/spreadsheets/d/1vqpnYo_Opcwi2rpMeieAoFjni5PBkAO4J-Yqeamt8Fc/edit?gid=1890457431#gid=1890457431',
 
   // Google Apps Script Web App URL (สำหรับ Lock เลขใบเสร็จ)
   APPS_SCRIPT_URL: import.meta.env.VITE_APPS_SCRIPT_URL || '',
