@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useReceipts } from '../contexts/ReceiptContext';
 import { useAuth } from '../contexts/AuthContext';
 import { FISCAL_YEAR, ORG_INFO } from '../config/google.config';
-import { Settings, Shield, BookOpen, Hash, User, Save, Plus, Trash2, CheckCircle2, UserCheck, Table } from 'lucide-react';
+import { Settings, Shield, BookOpen, Hash, User, Save, Plus, Trash2, CheckCircle2, UserCheck, Table, Lock } from 'lucide-react';
 
 function FormField({ label, icon: Icon, children, hint }) {
   return (
@@ -101,15 +101,21 @@ export default function SettingsPage() {
               />
             </FormField>
             <FormField label="เลขที่ใบเสร็จถัดไป" icon={Hash}
-              hint={`รันต่อเนื่องอัตโนมัติ — ปีงบประมาณ ${form.fiscalYear}`}>
-              <input
-                type="number"
-                className="form-input"
-                value={form.nextReceiptNo}
-                onChange={e => setForm(f => ({ ...f, nextReceiptNo: e.target.value }))}
-                min="1"
-                style={{ fontWeight: 700, color: '#c9a84c' }}
-              />
+              hint="🔒 ระบบคำนวณและรันให้อัตโนมัติแยกตามเล่มจาก Sheets (ล็อคเพื่อป้องกันแก้ไข)">
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="number"
+                  className="form-input"
+                  value={form.nextReceiptNo}
+                  readOnly
+                  disabled
+                  style={{
+                    fontWeight: 800, color: '#c9a84c', background: 'rgba(201,168,76,0.08)',
+                    border: '1px solid rgba(201,168,76,0.3)', cursor: 'not-allowed', opacity: 0.85
+                  }}
+                />
+                <Lock size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#c9a84c' }} />
+              </div>
             </FormField>
             <FormField label="ปีงบประมาณ (2 หลักท้าย พ.ศ.)"
               hint={`เช่น 69 = พ.ศ. 2569 — ปัจจุบัน: ${FISCAL_YEAR}`}>
