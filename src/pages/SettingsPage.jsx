@@ -91,7 +91,7 @@ export default function SettingsPage() {
             <Hash size={15} />
             ตั้งค่าเลขใบเสร็จ & Google Sheets
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginBottom: 16 }}>
             <FormField label="เลขเล่มเริ่มต้น" icon={BookOpen}
               hint="เลขเล่มที่จะใช้ค่าเริ่มต้นสำหรับใบเสร็จใหม่">
               <input
@@ -231,7 +231,7 @@ export default function SettingsPage() {
             <div style={{ fontSize: 12, fontWeight: 700, color: '#c9a84c', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Plus size={14} /> เพิ่มรายชื่อเจ้าหน้าที่ผู้รับเงินใหม่
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr auto', gap: 12, alignItems: 'end' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, alignItems: 'end' }}>
               <FormField label="ชื่อ-นามสกุล">
                 <input
                   className="form-input"

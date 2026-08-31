@@ -487,6 +487,39 @@ h1, h2, h3, h4, h5, h6 {
   padding: 0 16px;
 }
 
+/* ปรับขนาดฟอนต์และช่องกรอกข้อมูลให้สมส่วนกับหน้าจอโน้ตบุ๊กและจอขนาดเล็กอัตโนมัติ */
+@media (max-width: 1400px) {
+  .form-label {
+    font-size: 12.5px;
+  }
+  .form-input, .form-select, .form-textarea {
+    font-size: 13.5px;
+    padding: 9px 12px;
+  }
+  .btn {
+    padding: 8px 16px;
+    font-size: 13.5px;
+  }
+  .btn-lg {
+    padding: 11px 22px;
+    font-size: 14.5px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .glass-card {
+    padding: 16px 20px !important;
+  }
+  .data-table th, .data-table td {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+  .badge {
+    padding: 2px 8px;
+    font-size: 10.5px;
+  }
+}
+
 @media (max-width: 768px) {
   .hide-mobile { display: none !important; }
 }

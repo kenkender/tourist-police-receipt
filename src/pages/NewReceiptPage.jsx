@@ -372,7 +372,7 @@ export default function NewReceiptPage() {
               <User size={12} />
               ข้อมูลผู้บริจาค / ผู้ชำระเงิน
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
               <FormField label="ยศ / คำนำหน้า" required>
                 <DonorPrefixSelect value={form.prefix} onChange={v => setField('prefix', v)} />
               </FormField>
@@ -407,7 +407,7 @@ export default function NewReceiptPage() {
           </div>
 
           {/* Row 3: รายการ / จำนวนเงิน */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 20 }}>
             <FormField label="รายการ (Description)" required icon={FileText} error={errors.description}>
               <div>
                 <select
@@ -476,7 +476,7 @@ export default function NewReceiptPage() {
             </div>
 
             {/* รายละเอียดผู้ลงนาม */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
               <FormField label="ชื่อผู้รับเงิน (ลงนาม)">
                 <input
                   className="form-input"
