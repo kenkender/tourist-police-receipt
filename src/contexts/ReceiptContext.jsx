@@ -43,7 +43,7 @@ function mapSheetRowToReceipt(row) {
     issuerEmail: row.issuer_email || '',
     issuerName: row.issuer_name || '',
     createdAt: row.created_at || new Date().toISOString(),
-    status: 'active',
+    status: row.status || 'ใช้งาน',
   };
 }
 
@@ -321,6 +321,36 @@ export function ReceiptProvider({ children }) {
     });
   }, [syncFromSheets]);
 
+  // ─── ยกเลิกใบเสร็จ ─────────────────────────────────────────────────────────
+  const cancelReceipt = useCallback((id) => {
+    setReceipts(prev => {
+      const target = prev.find(r => r.id === id);
+      if (!target) return prev;
+      const updated = prev.map(r => r.id === id ? { ...r, status: 'ยกเลิก' } : r);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+
+      const scriptUrl = GOOGLE_CONFIG.APPS_SCRIPT_URL;
+      if (scriptUrl) {
+        fetch(scriptUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            action: 'cancelReceipt',
+            receiptNo: target.receiptNo,
+            bookNo: target.bookNo,
+          }),
+        }).then(() => {
+          setTimeout(() => syncFromSheets(true), 2000);
+        }).catch(err => {
+          console.warn('[Cancel] Sheets sync notice:', err);
+        });
+      }
+
+      return updated;
+    });
+  }, [syncFromSheets]);
+
   const updateSettings = useCallback((newSettings) => {
     setSettings(prev => {
       const updated = { ...prev, ...newSettings };
@@ -374,12 +404,15 @@ export function ReceiptProvider({ children }) {
     const today = new Date().toISOString().split('T')[0];
     const thisMonth = today.slice(0, 7);
 
-    const todayReceipts = receipts.filter(r => r.createdAt?.startsWith(today));
-    const monthReceipts = receipts.filter(r => r.createdAt?.startsWith(thisMonth));
+    // คำนวณเฉพาะใบเสร็จที่ไม่อยู่ในสถานะ "ยกเลิก"
+    const validReceipts = receipts.filter(r => r.status !== 'ยกเลิก' && r.status !== 'cancelled');
+    const todayReceipts = validReceipts.filter(r => r.createdAt?.startsWith(today));
+    const monthReceipts = validReceipts.filter(r => r.createdAt?.startsWith(thisMonth));
 
     return {
       total: receipts.length,
-      totalAmount: receipts.reduce((s, r) => s + (Number(r.amount) || 0), 0),
+      activeCount: validReceipts.length,
+      totalAmount: validReceipts.reduce((s, r) => s + (Number(r.amount) || 0), 0),
       todayCount: todayReceipts.length,
       todayAmount: todayReceipts.reduce((s, r) => s + (Number(r.amount) || 0), 0),
       monthCount: monthReceipts.length,
@@ -389,7 +422,8 @@ export function ReceiptProvider({ children }) {
 
   const getDailySummaries = useCallback(() => {
     const map = {};
-    receipts.forEach(r => {
+    const validReceipts = receipts.filter(r => r.status !== 'ยกเลิก' && r.status !== 'cancelled');
+    validReceipts.forEach(r => {
       const day = r.createdAt?.split('T')[0] || r.date;
       if (!day) return;
       if (!map[day]) map[day] = { date: day, count: 0, amount: 0 };
@@ -408,6 +442,7 @@ export function ReceiptProvider({ children }) {
     syncFromSheets,
     createReceipt,
     deleteReceipt,
+    cancelReceipt,
     updateSettings,
     addSigner,
     removeSigner,

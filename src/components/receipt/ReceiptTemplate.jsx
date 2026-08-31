@@ -143,20 +143,47 @@ function ReceiptCopy({ data, copyType }) {
         </span>
       </div>
 
+      {/* Watermark/Stamp if cancelled */}
+      {data.status === 'ยกเลิก' && (
+        <div style={{
+          position: 'absolute', top: '45%', left: '50%', transform: 'translate(-50%, -50%) rotate(-15deg)',
+          fontSize: 42, fontWeight: 900, color: 'rgba(239,68,68,0.35)', border: '4px solid rgba(239,68,68,0.35)',
+          padding: '6px 28px', borderRadius: 12, pointerEvents: 'none', letterSpacing: 4, zIndex: 10,
+        }}>
+          ยกเลิก (VOID)
+        </div>
+      )}
+
       {/* ลายเซ็น */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 2 }}>
-        <div style={{ textAlign: 'center', width: 220 }}>
-          <div style={{ fontSize: 11, marginBottom: 2 }}>
-            ลงชื่อ
+      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 6 }}>
+        <div style={{ textAlign: 'center', paddingRight: 10 }}>
+          <div style={{ display: 'inline-block', position: 'relative', textAlign: 'center' }}>
+            <div style={{
+              height: 32,
+              borderBottom: '1px solid #94a3b8',
+              marginBottom: 3,
+              position: 'relative',
+              minWidth: 160,
+            }}>
+              {signerRank && (
+                <span style={{
+                  position: 'absolute',
+                  right: '100%',
+                  bottom: 2,
+                  whiteSpace: 'nowrap',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  paddingRight: 2,
+                }}>
+                  {signerRank}
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+              ({signerName || '—'})
+            </div>
+            <div style={{ fontSize: 11, color: '#475569', marginTop: 1 }}>{signerPosition || ''}</div>
           </div>
-          <div style={{
-            height: 36, borderBottom: '1px solid #94a3b8',
-            marginBottom: 2,
-          }} />
-          <div style={{ fontSize: 12, fontWeight: 600 }}>
-            ({signerRank ? `${signerRank} ` : ''}{signerName || '—'})
-          </div>
-          <div style={{ fontSize: 11, color: '#475569', marginTop: 1 }}>{signerPosition || ''}</div>
         </div>
       </div>
     </div>

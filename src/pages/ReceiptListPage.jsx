@@ -7,11 +7,11 @@ import CustomModal from '../components/common/CustomModal';
 import { getGoogleSheetUrl } from '../config/google.config';
 import {
   BookOpen, Search, RotateCcw, Printer,
-  Trash2, Eye, ChevronLeft, ChevronRight, X, Table, ExternalLink,
+  Trash2, Eye, ChevronLeft, ChevronRight, X, Table, ExternalLink, Ban,
 } from 'lucide-react';
 
 export default function ReceiptListPage() {
-  const { receipts, settings, deleteReceipt } = useReceipts();
+  const { receipts, settings, deleteReceipt, cancelReceipt } = useReceipts();
   const { isAdmin } = useAuth();
   const sheetUrl = getGoogleSheetUrl(settings?.spreadsheetUrl);
 
@@ -22,6 +22,7 @@ export default function ReceiptListPage() {
   const [page, setPage] = useState(1);
   const [selectedItem, setSelectedItem] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
   const PAGE_SIZE = 15;
 
   // รวบรวมรายชื่อเล่มที่มีในระบบทั้งหมดเพื่อใช้เป็นตัวเลือกใน Filter
@@ -52,7 +53,9 @@ export default function ReceiptListPage() {
     return list;
   }, [receipts, selectedBookNo, search, startDate, endDate]);
 
-  const totalAmount = filtered.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+  const totalAmount = filtered
+    .filter(r => r.status !== 'ยกเลิก' && r.status !== 'cancelled')
+    .reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageData = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
@@ -66,6 +69,13 @@ export default function ReceiptListPage() {
     if (deleteTarget) {
       deleteReceipt(deleteTarget.id);
       setDeleteTarget(null);
+    }
+  };
+
+  const handleConfirmCancel = () => {
+    if (cancelTarget) {
+      cancelReceipt(cancelTarget.id);
+      setCancelTarget(null);
     }
   };
 
@@ -180,48 +190,101 @@ export default function ReceiptListPage() {
               </tr>
             </thead>
             <tbody>
-              {pageData.map(item => (
-                <tr key={item.id}>
-                  <td style={{ color: '#a8b5cc', fontSize: 12, whiteSpace: 'nowrap' }}>
-                    {toThaiDateShort(item.createdAt?.split('T')[0] || item.date)}
-                  </td>
-                  <td>
-                    <span className="badge badge-blue">{item.bookNo}/{item.receiptNo}</span>
-                  </td>
-                  <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {item.receivedFrom || '—'}
-                  </td>
-                  <td style={{ color: '#a8b5cc', fontSize: 12, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {item.description || '—'}
-                  </td>
-                  <td style={{ textAlign: 'right', fontWeight: 700, color: '#c9a84c' }}>
-                    {formatBaht(item.amount)}
-                  </td>
-                  <td style={{ color: '#6b7a99', fontSize: 11 }}>
-                    {item.issuerEmail?.split('@')[0] || '—'}
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => setSelectedItem(item)}
-                        title="ดู / พิมพ์ใบเสร็จ"
-                      >
-                        <Eye size={13} /> พรีวิว
-                      </button>
-                      {isAdmin && (
-                        <button
-                          className="btn btn-danger btn-sm"
-                          onClick={() => handleDeleteClick(item)}
-                          title="ลบ"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+              {pageData.map(item => {
+                const isCancelled = item.status === 'ยกเลิก' || item.status === 'cancelled';
+                return (
+                  <tr key={item.id} style={{ opacity: isCancelled ? 0.75 : 1 }}>
+                    <td style={{ color: '#a8b5cc', fontSize: 12, whiteSpace: 'nowrap' }}>
+                      {toThaiDateShort(item.createdAt?.split('T')[0] || item.date)}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span className="badge badge-blue">{item.bookNo}/{item.receiptNo}</span>
+                        {isCancelled && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                            background: 'rgba(239,68,68,0.2)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.4)',
+                          }}>
+                            ยกเลิก
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.receivedFrom || '—'}
+                    </td>
+                    <td style={{ color: '#a8b5cc', fontSize: 12, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.description || '—'}
+                    </td>
+                    <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                      {isCancelled ? (
+                        <span style={{ textDecoration: 'line-through', color: '#ef4444' }} title="ยกเลิกบิลแล้ว (ไม่นำมารวมยอด)">
+                          {formatBaht(item.amount)}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#c9a84c' }}>{formatBaht(item.amount)}</span>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td style={{ color: '#6b7a99', fontSize: 11 }}>
+                      {item.issuerEmail?.split('@')[0] || '—'}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center' }}>
+                        {/* 1. ปุ่มพรีวิว */}
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={() => setSelectedItem(item)}
+                          title="ดู / พิมพ์ใบเสร็จ"
+                        >
+                          <Eye size={13} /> พรีวิว
+                        </button>
+
+                        {/* 2. ปุ่มยกเลิกบิล (อยู่ตรงกลาง) */}
+                        {isCancelled ? (
+                          <span style={{
+                            fontSize: 11, fontWeight: 700, padding: '4px 8px', borderRadius: 6,
+                            background: 'rgba(239,68,68,0.15)', color: '#fca5a5', border: '1px solid rgba(239,68,68,0.3)',
+                          }}>
+                            ยกเลิกแล้ว
+                          </span>
+                        ) : (
+                          <button
+                            className="btn btn-sm"
+                            onClick={() => setCancelTarget(item)}
+                            title="ยกเลิกบิลนี้"
+                            style={{
+                              background: 'rgba(245, 158, 11, 0.15)',
+                              color: '#f59e0b',
+                              border: '1px solid rgba(245, 158, 11, 0.3)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              padding: '5px 10px',
+                              fontSize: 12,
+                              fontWeight: 600,
+                              borderRadius: 6,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <Ban size={13} /> ยกเลิกบิล
+                          </button>
+                        )}
+
+                        {/* 3. ปุ่มลบ */}
+                        {isAdmin && (
+                          <button
+                            className="btn btn-danger btn-sm"
+                            onClick={() => handleDeleteClick(item)}
+                            title="ลบ"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {pageData.length === 0 && (
                 <tr>
                   <td colSpan={7} style={{ textAlign: 'center', padding: 40, color: '#4b5a75' }}>
@@ -311,6 +374,25 @@ export default function ReceiptListPage() {
         ] : []}
         confirmText="ยืนยันการลบข้อมูล"
         cancelText="ยกเลิก"
+      />
+
+      {/* Cancel Confirmation Modal */}
+      <CustomModal
+        isOpen={!!cancelTarget}
+        onClose={() => setCancelTarget(null)}
+        onConfirm={handleConfirmCancel}
+        type="confirm"
+        title="ยืนยันการยกเลิกบิล?"
+        message={`คุณต้องการยกเลิกใบเสร็จเลขที่ ${cancelTarget?.receiptNo} (เล่มที่ ${cancelTarget?.bookNo || 1}) ใช่หรือไม่? ยอดเงินจะถูกตัดออกจากสรุประบบอัตโนมัติ และอัปเดตสถานะ "ยกเลิก" ลงใน Google Sheets`}
+        details={cancelTarget ? [
+          { label: 'เล่มที่ / เลขที่', value: `${cancelTarget.bookNo} / ${cancelTarget.receiptNo}` },
+          { label: 'ผู้บริจาค/ผู้ชำระ', value: cancelTarget.receivedFrom || '-' },
+          { label: 'รายการ', value: cancelTarget.description || '-' },
+          { label: 'จำนวนเงินที่ตัดยอด', value: `฿${formatBaht(cancelTarget.amount)}`, isBaht: true },
+        ] : []}
+        confirmText="ยืนยันยกเลิกบิล"
+        cancelText="ย้อนกลับ"
+        confirmBtnStyle="gold"
       />
     </div>
   );

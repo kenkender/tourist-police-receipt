@@ -52,6 +52,9 @@ function doPost(e) {
     if (action === 'saveReceipt') {
       return saveReceipt(data, headers);
     }
+    if (action === 'cancelReceipt') {
+      return cancelReceiptInSheet(data, headers);
+    }
     if (action === 'deleteReceipt') {
       return deleteReceiptFromSheet(data, headers);
     }
@@ -171,6 +174,7 @@ function saveReceipt(data, headers) {
       data.issuerEmail || '',
       data.issuerName || '',
       new Date().toISOString(),
+      data.status || 'ใช้งาน',
     ];
 
     sheet.appendRow(row);
@@ -186,6 +190,41 @@ function saveReceipt(data, headers) {
     return response({ success: false, error: err.message }, headers);
   } finally {
     lock.releaseLock();
+  }
+}
+
+
+/**
+ * อัปเดตสถานะยกเลิกใบเสร็จใน Google Sheets
+ */
+function cancelReceiptInSheet(data, headers) {
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(RECEIPTS_SHEET);
+    if (!sheet) return response({ success: true, message: 'Sheet not found' }, headers);
+
+    const existing = sheet.getDataRange().getValues();
+    const headerRow = existing[0];
+    let statusColIndex = headerRow.findIndex(h => String(h).toLowerCase().trim() === 'status');
+
+    if (statusColIndex === -1) {
+      statusColIndex = headerRow.length;
+      sheet.getRange(1, statusColIndex + 1).setValue('status').setFontWeight('bold').setBackground('#1e3a8a').setFontColor('#ffffff');
+    }
+
+    for (let i = existing.length - 1; i >= 1; i--) {
+      const rowReceiptNo = String(existing[i][0]).trim();
+      const rowBookNo = String(existing[i][1]).trim();
+
+      if (rowReceiptNo === String(data.receiptNo).trim() &&
+          (!data.bookNo || rowBookNo === String(data.bookNo).trim())) {
+        sheet.getRange(i + 1, statusColIndex + 1).setValue('ยกเลิก');
+        return response({ success: true, message: 'อัปเดตสถานะยกเลิกใน Sheets เรียบร้อย' }, headers);
+      }
+    }
+    return response({ success: true, message: 'ไม่พบรายการที่ต้องการยกเลิกใน Sheets' }, headers);
+  } catch (err) {
+    return response({ success: false, error: err.message }, headers);
   }
 }
 
@@ -294,7 +333,7 @@ function initReceiptsSheet(ss) {
   const headers = [
     'receipt_no', 'book_no', 'date', 'received_from', 'description',
     'amount', 'signer_name', 'signer_position', 'signer_rank',
-    'issuer_email', 'issuer_name', 'created_at'
+    'issuer_email', 'issuer_name', 'created_at', 'status'
   ];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
   sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#1e3a8a').setFontColor('#ffffff');

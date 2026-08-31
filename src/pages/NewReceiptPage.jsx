@@ -222,7 +222,7 @@ export default function NewReceiptPage() {
   const validate = () => {
     const e = {};
     if (!form.firstName.trim()) e.firstName = 'กรุณากรอกชื่อผู้รับเงิน / ผู้บริจาค';
-    if (!form.amount || isNaN(form.amount) || Number(form.amount) <= 0) e.amount = 'กรุณากรอกจำนวนเงินให้ถูกต้อง';
+    if (form.amount === '' || form.amount === null || form.amount === undefined || isNaN(form.amount) || Number(form.amount) < 0) e.amount = 'กรุณากรอกจำนวนเงินให้ถูกต้อง';
     if (!form.description) e.description = 'กรุณากรอกรายการ';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -441,7 +441,7 @@ export default function NewReceiptPage() {
                 step="0.01"
                 style={{ fontWeight: 800, fontSize: 18, color: '#c9a84c' }}
               />
-              {form.amount > 0 && (
+              {form.amount !== '' && form.amount !== null && !isNaN(form.amount) && Number(form.amount) >= 0 && (
                 <div style={{ fontSize: 11, color: '#6b7a99', marginTop: 4 }}>
                   ({bahtToText(Number(form.amount))})
                 </div>
