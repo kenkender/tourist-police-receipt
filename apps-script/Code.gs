@@ -2,13 +2,13 @@
  * Google Apps Script — ระบบออกใบเสร็จรับเงิน & ตรวจสอบสิทธิ์ผู้ใช้
  * กองทุนสวัสดิการ กองบัญชาการตำรวจท่องเที่ยว
  * 
- * [แก้ไขใหม่] แยกชุดเลขที่ใบเสร็จตาม "เลขเล่ม (bookNo)" และ "ปีงบประมาณ (fiscalYear)"
- * - เล่มที่ 1: 69-00001, 69-00002, ...
- * - เล่มที่ 2: 69-00001, ... 69-00014, 69-00015, ...
+ * [แก้ไขสมบูรณ์แบบ]
+ * 1. getNextReceiptNumber เป็น READ-ONLY 100% (ไม่แก้ไข/ไม่รันเลขมั่วเมื่อกดรีเฟรชหน้าเว็บ)
+ * 2. คำนวณเลขที่ใบเสร็จแยกตาม "เลขเล่ม (bookNo)" และ "ปีงบประมาณ (fiscalYear)" จากข้อมูลที่มีอยู่จริงใน sheet
+ * 3. ใช้ LockService ใน saveReceipt เพื่อป้องกันเลขซ้ำเมื่อบันทึกพร้อมกันหลายเครื่อง
  */
 
 const SPREADSHEET_ID = '1vqpnYo_Opcwi2rpMeieAoFjni5PBkAO4J-Yqeamt8Fc';
-const COUNTER_SHEET = 'counter';
 const RECEIPTS_SHEET = 'receipts';
 const USERS_SHEET = 'users';
 
@@ -63,25 +63,17 @@ function doPost(e) {
 }
 
 /**
- * ขอเลขใบเสร็จถัดไป — แยกตามเลขเล่ม (bookNo) และ ปีงบประมาณ (fiscalYear)
- * - สแกนหาเลขสูงสุดที่มีใน receipts sheet สำหรับ bookNo นี้ก่อนเสมอ
- * - ใช้ LockService ป้องกัน Race Condition
+ * ขอเลขใบเสร็จถัดไป (READ-ONLY 100%)
+ * - ไม่มีการเขียนลง Sheet ใดๆ เมื่อเรียกดูเลข (กดรีเฟรช 100 ครั้งเลขก็ไม่เปลี่ยน)
+ * - คำนวณจากเลขสูงสุดที่มีจริงใน receipts sheet แยกตาม bookNo และ fiscalYear
  */
 function getNextReceiptNumber(e, headers) {
-  const lock = LockService.getScriptLock();
-  const acquired = lock.tryLock(10000);
-
-  if (!acquired) {
-    return response({ success: false, error: 'ระบบกำลังประมวลผล กรุณาลองใหม่' }, headers);
-  }
-
   try {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     const fiscalYear = (e && e.parameter && e.parameter.year) ? String(e.parameter.year).trim() : getFiscalYear();
     const bookNo = (e && e.parameter && e.parameter.bookNo) ? String(e.parameter.bookNo).trim() : '1';
 
-    // ─── 1. หาเลขสูงสุดจาก receipts sheet สำหรับ (fiscalYear, bookNo) เดียวกัน ───────
-    let maxFromReceipts = 0;
+    let maxNumber = 0;
     const receiptsSheet = ss.getSheetByName(RECEIPTS_SHEET);
     if (receiptsSheet && receiptsSheet.getLastRow() > 1) {
       const rData = receiptsSheet.getDataRange().getValues();
@@ -92,65 +84,12 @@ function getNextReceiptNumber(e, headers) {
         if (rno.startsWith(fiscalYear + '-') && rBook === bookNo) {
           const parts = rno.split('-');
           const num = parseInt(parts[1], 10);
-          if (!isNaN(num) && num > maxFromReceipts) maxFromReceipts = num;
+          if (!isNaN(num) && num > maxNumber) maxNumber = num;
         }
       }
     }
 
-    // ─── 2. หาเลขจาก counter sheet สำหรับ (fiscalYear, bookNo) ───────────────
-    let maxFromCounter = 0;
-    let counterRowIndex = -1;
-    let counterSheet = ss.getSheetByName(COUNTER_SHEET);
-    if (!counterSheet) {
-      initCounterSheet(ss);
-      counterSheet = ss.getSheetByName(COUNTER_SHEET);
-    }
-    const cData = counterSheet.getDataRange().getValues();
-    const hasBookCol = cData[0] && cData[0].length >= 4 && String(cData[0][1]).toLowerCase() === 'book_no';
-
-    if (hasBookCol) {
-      for (let i = 1; i < cData.length; i++) {
-        if (String(cData[i][0]).trim() === fiscalYear && String(cData[i][1]).trim() === bookNo) {
-          counterRowIndex = i + 1;
-          maxFromCounter = parseInt(cData[i][2], 10) || 0;
-          break;
-        }
-      }
-    } else {
-      const targetKey = fiscalYear + '_' + bookNo;
-      for (let i = 1; i < cData.length; i++) {
-        const key = String(cData[i][0]).trim();
-        if (key === targetKey || (bookNo === '1' && key === fiscalYear)) {
-          counterRowIndex = i + 1;
-          maxFromCounter = parseInt(cData[i][1], 10) || 0;
-          break;
-        }
-      }
-    }
-
-    // ─── 3. nextNumber = MAX(receipts, counter) + 1 ───────────────────────────
-    const currentMax = Math.max(maxFromReceipts, maxFromCounter);
-    const nextNumber = currentMax + 1;
-
-    // ─── 4. อัปเดต counter sheet ──────────────────────────────────────────────
-    if (hasBookCol) {
-      if (counterRowIndex === -1) {
-        counterSheet.appendRow([fiscalYear, bookNo, nextNumber, new Date()]);
-      } else {
-        counterSheet.getRange(counterRowIndex, 3).setValue(nextNumber);
-        counterSheet.getRange(counterRowIndex, 4).setValue(new Date());
-      }
-    } else {
-      const targetKey = fiscalYear + '_' + bookNo;
-      if (counterRowIndex === -1) {
-        counterSheet.appendRow([targetKey, nextNumber, new Date()]);
-      } else {
-        counterSheet.getRange(counterRowIndex, 1).setValue(targetKey);
-        counterSheet.getRange(counterRowIndex, 2).setValue(nextNumber);
-        counterSheet.getRange(counterRowIndex, 3).setValue(new Date());
-      }
-    }
-
+    const nextNumber = maxNumber + 1;
     const receiptNo = fiscalYear + '-' + String(nextNumber).padStart(5, '0');
 
     return response({
@@ -160,7 +99,91 @@ function getNextReceiptNumber(e, headers) {
       year: fiscalYear,
       bookNo: bookNo,
     }, headers);
+  } catch (err) {
+    return response({ success: false, error: err.message }, headers);
+  }
+}
 
+/**
+ * บันทึกใบเสร็จลง Google Sheets พร้อม LockService ป้องกัน race condition
+ */
+function saveReceipt(data, headers) {
+  const lock = LockService.getScriptLock();
+  const acquired = lock.tryLock(10000);
+
+  if (!acquired) {
+    return response({ success: false, error: 'ระบบกำลังประมวลผล กรุณาลองใหม่' }, headers);
+  }
+
+  try {
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    let sheet = ss.getSheetByName(RECEIPTS_SHEET);
+
+    if (!sheet) {
+      sheet = initReceiptsSheet(ss);
+    }
+
+    const fiscalYear = data.fiscalYear || getFiscalYear();
+    const bookNo = String(data.bookNo || '1').trim();
+
+    // 1. หาเลขสูงสุดปัจจุบันใน receipts sheet สำหรับ bookNo และ fiscalYear นี้
+    let maxNumber = 0;
+    const existing = sheet.getDataRange().getValues();
+    for (let i = 1; i < existing.length; i++) {
+      const rno = String(existing[i][0] || '').trim();
+      const rBook = String(existing[i][1] || '').trim();
+      if (rno.startsWith(fiscalYear + '-') && rBook === bookNo) {
+        const parts = rno.split('-');
+        const num = parseInt(parts[1], 10);
+        if (!isNaN(num) && num > maxNumber) maxNumber = num;
+      }
+    }
+
+    // 2. ถ้าผู้ส่งระบุ receiptNo มา ให้ตรวจสอบว่าซ้ำในเล่มนี้หรือไม่
+    let receiptNo = data.receiptNo ? String(data.receiptNo).trim() : '';
+    let isDuplicate = false;
+    if (receiptNo) {
+      for (let i = 1; i < existing.length; i++) {
+        if (String(existing[i][0]).trim() === receiptNo &&
+            String(existing[i][1]).trim() === bookNo) {
+          isDuplicate = true;
+          break;
+        }
+      }
+    }
+
+    // ถ้าซ้ำ หรือ ไม่มีเลข ให้รันเลขถัดไปให้อัตโนมัติ (maxNumber + 1)
+    if (!receiptNo || isDuplicate) {
+      const nextNum = maxNumber + 1;
+      receiptNo = fiscalYear + '-' + String(nextNum).padStart(5, '0');
+    }
+
+    const row = [
+      receiptNo,
+      bookNo,
+      data.date || '',
+      data.receivedFrom || '',
+      data.description || '',
+      data.amount || 0,
+      data.signerName || '',
+      data.signerPosition || '',
+      data.signerRank || '',
+      data.issuerEmail || '',
+      data.issuerName || '',
+      new Date().toISOString(),
+    ];
+
+    sheet.appendRow(row);
+
+    return response({
+      success: true,
+      message: 'บันทึกสำเร็จ',
+      receiptNo: receiptNo,
+      bookNo: bookNo,
+    }, headers);
+
+  } catch (err) {
+    return response({ success: false, error: err.message }, headers);
   } finally {
     lock.releaseLock();
   }
@@ -235,50 +258,6 @@ function getUserRole(email, name, headers) {
 }
 
 /**
- * บันทึกใบเสร็จลง Google Sheets
- */
-function saveReceipt(data, headers) {
-  try {
-    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const sheet = ss.getSheetByName(RECEIPTS_SHEET);
-
-    if (!sheet) {
-      initReceiptsSheet(ss);
-      return saveReceipt(data, headers);
-    }
-
-    // ตรวจสอบเลขซ้ำเฉพาะในเล่มเดียวกัน (receiptNo + bookNo)
-    const existing = sheet.getDataRange().getValues();
-    for (let i = 1; i < existing.length; i++) {
-      if (String(existing[i][0]).trim() === String(data.receiptNo).trim() &&
-          String(existing[i][1]).trim() === String(data.bookNo).trim()) {
-        return response({ success: false, error: 'เลขที่ใบเสร็จซ้ำในเล่มนี้' }, headers);
-      }
-    }
-
-    const row = [
-      data.receiptNo,
-      data.bookNo,
-      data.date,
-      data.receivedFrom,
-      data.description,
-      data.amount,
-      data.signerName,
-      data.signerPosition,
-      data.signerRank,
-      data.issuerEmail,
-      data.issuerName,
-      new Date().toISOString(),
-    ];
-
-    sheet.appendRow(row);
-    return response({ success: true, message: 'บันทึกสำเร็จ' }, headers);
-  } catch (err) {
-    return response({ success: false, error: err.message }, headers);
-  }
-}
-
-/**
  * ดึงข้อมูลใบเสร็จทั้งหมด
  */
 function getAllReceipts(headers) {
@@ -308,12 +287,6 @@ function initUsersSheet(ss) {
   sheet.getRange(1, 1, 1, 3).setValues([['email', 'role', 'name']]);
   sheet.getRange(1, 1, 1, 3).setFontWeight('bold').setBackground('#1e3a8a').setFontColor('#ffffff');
   return sheet;
-}
-
-function initCounterSheet(ss) {
-  const sheet = ss.insertSheet(COUNTER_SHEET);
-  sheet.getRange(1, 1, 1, 4).setValues([['fiscal_year', 'book_no', 'last_number', 'updated_at']]);
-  sheet.getRange(1, 1, 1, 4).setFontWeight('bold').setBackground('#1e3a8a').setFontColor('#ffffff');
 }
 
 function initReceiptsSheet(ss) {
