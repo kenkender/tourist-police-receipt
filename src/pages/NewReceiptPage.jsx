@@ -296,8 +296,6 @@ export default function NewReceiptPage() {
 
   return (
     <div style={{ padding: '24px 16px', maxWidth: 1280, margin: '0 auto' }}>
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
-
       {/* Header */}
       <div className="no-print" style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
