@@ -155,11 +155,14 @@ function ReceiptCopy({ data, copyType }) {
       )}
 
       {/* ลายเซ็น */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 6 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 4 }}>
         <div style={{ textAlign: 'center', paddingRight: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#334155', marginBottom: 2 }}>
+            ลงชื่อ
+          </div>
           <div style={{ display: 'inline-block', position: 'relative', textAlign: 'center' }}>
             <div style={{
-              height: 32,
+              height: 28,
               borderBottom: '1px solid #94a3b8',
               marginBottom: 3,
               position: 'relative',
