@@ -359,37 +359,20 @@ export function ReceiptProvider({ children }) {
       const scriptUrl = GOOGLE_CONFIG.APPS_SCRIPT_URL;
       if (scriptUrl) {
         const payload = {
+          action: 'cancelReceipt',
           receiptNo: target.receiptNo,
           bookNo: target.bookNo,
-          date: target.date,
-          receivedFrom: target.receivedFrom,
-          description: cancelDesc,
-          amount: target.amount,
-          signerName: target.signerName,
-          signerPosition: target.signerPosition,
-          signerRank: target.signerRank,
-          issuerEmail: target.issuerEmail,
-          issuerName: target.issuerName,
           status: 'ยกเลิก',
         };
 
-        // 1. เรียก action: cancelReceipt (สำหรับ Apps Script เวอร์ชันใหม่)
         fetch(scriptUrl, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'cancelReceipt', ...payload }),
-        }).catch(err => console.warn('[Cancel] notice:', err));
-
-        // 2. เรียก action: saveReceipt พร้อม status 'ยกเลิก' (การันตีเพิ่มแถวใหม่ลง Google Sheets 100% แม้เป็น Apps Script เดิม)
-        fetch(scriptUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action: 'saveReceipt', ...payload }),
+          body: JSON.stringify(payload),
         }).then(() => {
           setTimeout(() => syncFromSheets(true), 2000);
-        }).catch(err => console.warn('[Cancel-Save] notice:', err));
+        }).catch(err => console.warn('[Cancel] notice:', err));
       }
 
       return updated;

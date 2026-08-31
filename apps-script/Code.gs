@@ -195,7 +195,7 @@ function saveReceipt(data, headers) {
 
 
 /**
- * อัปเดตสถานะและเพิ่มแถวบันทึกการยกเลิกใบเสร็จใน Google Sheets
+ * อัปเดตสถานะยกเลิกใบเสร็จในแถวเดิมบน Google Sheets (ไม่สร้างเลขใบเสร็จใหม่)
  */
 function cancelReceiptInSheet(data, headers) {
   try {
@@ -212,37 +212,31 @@ function cancelReceiptInSheet(data, headers) {
       sheet.getRange(1, statusColIndex + 1).setValue('status').setFontWeight('bold').setBackground('#1e3a8a').setFontColor('#ffffff');
     }
 
-    let foundRow = null;
-    for (let i = existing.length - 1; i >= 1; i--) {
+    const targetReceiptNo = String(data.receiptNo).trim();
+    const targetBookNo = String(data.bookNo || '1').trim();
+    let updated = false;
+
+    for (let i = 1; i < existing.length; i++) {
       const rowReceiptNo = String(existing[i][0]).trim();
       const rowBookNo = String(existing[i][1]).trim();
 
-      if (rowReceiptNo === String(data.receiptNo).trim() &&
-          (!data.bookNo || rowBookNo === String(data.bookNo).trim())) {
+      if (rowReceiptNo === targetReceiptNo && (!targetBookNo || rowBookNo === targetBookNo)) {
+        // 1. อัปเดตคอลัมน์ status เป็น 'ยกเลิก'
         sheet.getRange(i + 1, statusColIndex + 1).setValue('ยกเลิก');
-        if (!foundRow) foundRow = existing[i];
+
+        // 2. อัปเดตคอลัมน์รายการ (description - คอลัมน์ที่ 5 / E) ให้เติมคำว่า (ยกเลิก) ต่อท้ายด้วย
+        const currentDesc = String(existing[i][4] || '');
+        if (!currentDesc.includes('(ยกเลิก)')) {
+          sheet.getRange(i + 1, 5).setValue(currentDesc ? `${currentDesc} (ยกเลิก)` : 'ยกเลิกใบเสร็จ');
+        }
+        updated = true;
       }
     }
 
-    // เพิ่มแถวใหม่สถานะยกเลิกตามความต้องการของผู้ใช้
-    const cancelRow = [
-      String(data.receiptNo).trim(),
-      String(data.bookNo || '1').trim(),
-      data.date || (foundRow ? foundRow[2] : ''),
-      data.receivedFrom || (foundRow ? foundRow[3] : ''),
-      data.description ? (String(data.description).includes('(ยกเลิก)') ? data.description : `${data.description} (ยกเลิก)`) : (foundRow ? `${foundRow[4]} (ยกเลิก)` : 'ยกเลิกใบเสร็จ'),
-      data.amount || (foundRow ? foundRow[5] : 0),
-      data.signerName || (foundRow ? foundRow[6] : ''),
-      data.signerPosition || (foundRow ? foundRow[7] : ''),
-      data.signerRank || (foundRow ? foundRow[8] : ''),
-      data.issuerEmail || (foundRow ? foundRow[9] : ''),
-      data.issuerName || (foundRow ? foundRow[10] : ''),
-      new Date().toISOString(),
-      'ยกเลิก',
-    ];
-    sheet.appendRow(cancelRow);
-
-    return response({ success: true, message: 'บันทึกสถานะและเพิ่มแถวยกเลิกใน Sheets เรียบร้อย' }, headers);
+    if (updated) {
+      return response({ success: true, message: 'อัปเดตสถานะยกเลิกบิลเดิมเรียบร้อย' }, headers);
+    }
+    return response({ success: true, message: 'ไม่พบรายการใบเสร็จเดิมที่ต้องการยกเลิก' }, headers);
   } catch (err) {
     return response({ success: false, error: err.message }, headers);
   }
