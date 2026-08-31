@@ -175,15 +175,19 @@ export default function NewReceiptPage() {
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState(null);
 
-  const refreshNextNumber = () => {
-    getNextReceiptNumber().then(({ formatted }) => {
+  const refreshNextNumber = (targetBookNo) => {
+    const bNo = targetBookNo || form.bookNo || '1';
+    getNextReceiptNumber(bNo).then(({ formatted }) => {
       setForm(f => ({ ...f, receiptNo: formatted }));
     });
   };
 
+  // รีเฟรชเลขที่ใบเสร็จตามเล่มที่เลือก (bookNo) ทุกครั้งที่มีการเปลี่ยนเล่ม
   useEffect(() => {
-    refreshNextNumber();
-  }, []);
+    if (form.bookNo) {
+      refreshNextNumber(form.bookNo);
+    }
+  }, [form.bookNo]);
 
   useEffect(() => {
     const parts = [form.prefix, form.firstName, form.lastName].filter(Boolean);
@@ -233,15 +237,14 @@ export default function NewReceiptPage() {
       const nextNo = result.nextReceiptNo;
 
       setToast({
-        msg: `บันทึกใบเสร็จ ${savedNo} สำเร็จแล้ว! ระบบรันฉบับถัดไป (${nextNo}) ให้เรียบร้อย`,
+        msg: `บันทึกใบเสร็จ ${savedNo} (เล่มที่ ${currentBookNo}) สำเร็จแล้ว!`,
         type: 'success',
       });
 
       // ล้างฟอร์ม — คงค่า bookNo ที่ผู้ใช้กำลังใช้งานอยู่ไว้
       const activeDefault = signers.find(s => s.isDefault) || signers[0] || ORG_INFO.defaultSigner;
-      const currentBookNo = form.bookNo; // คงเล่มที่ใช้งานอยู่
       setForm({
-        bookNo: currentBookNo,  // ← คงค่าเดิม ไม่ reset กลับเป็น default
+        bookNo: currentBookNo,  // ← คงค่าเดิม
         receiptNo: nextNo,
         date: todayISO(),
         prefix: '',
@@ -257,12 +260,12 @@ export default function NewReceiptPage() {
       });
       setErrors({});
 
-      // โหลดเลขที่ถัดไปจาก Sheets ใหม่ (ใช้เวลา 2-3 วิ. หลัง Sheets อัปเดต)
-      setTimeout(() => refreshNextNumber(), 3000);
+      // โหลดเลขที่ถัดไปสำหรับเล่มนี้จาก Sheets ใหม่
+      setTimeout(() => refreshNextNumber(currentBookNo), 2000);
 
     } catch (err) {
       setToast({ msg: err.message, type: 'error' });
-      refreshNextNumber();
+      refreshNextNumber(form.bookNo);
     } finally {
       setLoading(false);
     }

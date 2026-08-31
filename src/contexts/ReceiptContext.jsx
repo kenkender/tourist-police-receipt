@@ -153,35 +153,28 @@ export function ReceiptProvider({ children }) {
     };
   }, [syncFromSheets]);
 
-  // ─── คำนวณเลขใบเสร็จถัดไป (ใช้เพื่อแสดงผล preview เท่านั้น) ───────────────
-  const getNextReceiptNumber = useCallback(async () => {
+  // ─── คำนวณเลขใบเสร็จถัดไป แยกตามเลขเล่ม (bookNo) ─────────────────────────
+  const getNextReceiptNumber = useCallback(async (bookNo = '1') => {
     const latestSettings = loadFromStorage(SETTINGS_KEY, settings);
     const year = latestSettings.fiscalYear || FISCAL_YEAR;
+    const targetBook = String(bookNo || '1').trim();
 
-    // ลองดึงจาก Sheets ก่อน (เพื่อให้เลขล่าสุดที่แม่นยำ)
+    // 1. ลองดึงจาก Sheets ก่อน (ส่งปีงบประมาณและเลขเล่ม)
     const scriptUrl = GOOGLE_CONFIG.APPS_SCRIPT_URL;
     if (scriptUrl) {
       try {
-        const res = await fetch(`${scriptUrl}?action=getReceipts`, {
+        const res = await fetch(`${scriptUrl}?action=nextNumber&year=${year}&bookNo=${encodeURIComponent(targetBook)}`, {
           method: 'GET',
           cache: 'no-store',
         });
         if (res.ok) {
           const json = await res.json();
-          if (json.success && Array.isArray(json.data)) {
-            let maxNumber = 0;
-            json.data.forEach(row => {
-              const rno = String(row.receipt_no || '');
-              if (rno.startsWith(`${year}-`)) {
-                const num = parseInt(rno.split('-')[1], 10);
-                if (!isNaN(num) && num > maxNumber) maxNumber = num;
-              }
-            });
-            const nextNo = maxNumber + 1;
+          if (json.success && json.receiptNo) {
             return {
-              number: nextNo,
-              formatted: `${year}-${String(nextNo).padStart(5, '0')}`,
+              number: json.number,
+              formatted: json.receiptNo,
               year,
+              bookNo: targetBook,
             };
           }
         }
@@ -190,11 +183,14 @@ export function ReceiptProvider({ children }) {
       }
     }
 
-    // Fallback: คำนวณจาก local state
+    // 2. Fallback: คำนวณจาก local state โดยกรองเฉพาะเล่ม (bookNo) เดียวกัน
+    const latestReceipts = loadFromStorage(STORAGE_KEY, receipts);
     let maxNumber = 0;
-    receipts.forEach(r => {
-      if (r.receiptNo && r.receiptNo.startsWith(`${year}-`)) {
-        const num = parseInt(r.receiptNo.split('-')[1], 10);
+    latestReceipts.forEach(r => {
+      const rBook = String(r.bookNo || '').trim();
+      if (r.receiptNo && r.receiptNo.startsWith(`${year}-`) && rBook === targetBook) {
+        const parts = r.receiptNo.split('-');
+        const num = parseInt(parts[1], 10);
         if (!isNaN(num) && num > maxNumber) maxNumber = num;
       }
     });
@@ -203,6 +199,7 @@ export function ReceiptProvider({ children }) {
       number: nextNo,
       formatted: `${year}-${String(nextNo).padStart(5, '0')}`,
       year,
+      bookNo: targetBook,
     };
   }, [receipts, settings]);
 
@@ -217,14 +214,15 @@ export function ReceiptProvider({ children }) {
       const scriptUrl = GOOGLE_CONFIG.APPS_SCRIPT_URL;
       const latestSettings = loadFromStorage(SETTINGS_KEY, settings);
       const year = latestSettings.fiscalYear || FISCAL_YEAR;
+      const targetBook = String(formData.bookNo || '1').trim();
 
       let finalReceiptNo;
       let finalNumber;
 
       if (scriptUrl) {
-        // ─── ขอเลขที่ใบเสร็จจาก Server พร้อม Lock ป้องกัน race condition ───
+        // ─── ขอเลขที่ใบเสร็จจาก Server สำหรับเล่ม (bookNo) นี้ พร้อม Lock ป้องกัน race condition ───
         try {
-          const res = await fetch(`${scriptUrl}?action=nextNumber&year=${year}`, {
+          const res = await fetch(`${scriptUrl}?action=nextNumber&year=${year}&bookNo=${encodeURIComponent(targetBook)}`, {
             method: 'GET',
             cache: 'no-store',
           });
@@ -237,11 +235,12 @@ export function ReceiptProvider({ children }) {
           throw new Error(`ไม่สามารถขอเลขที่ใบเสร็จได้: ${err.message}`);
         }
       } else {
-        // Fallback: คำนวณเลขจาก local
+        // Fallback: คำนวณเลขจาก local โดยกรองเฉพาะเล่มเดียวกัน
         const latestReceipts = loadFromStorage(STORAGE_KEY, receipts);
         let maxNumber = 0;
         latestReceipts.forEach(r => {
-          if (r.receiptNo && r.receiptNo.startsWith(`${year}-`)) {
+          const rBook = String(r.bookNo || '').trim();
+          if (r.receiptNo && r.receiptNo.startsWith(`${year}-`) && rBook === targetBook) {
             const num = parseInt(r.receiptNo.split('-')[1], 10);
             if (!isNaN(num) && num > maxNumber) maxNumber = num;
           }
