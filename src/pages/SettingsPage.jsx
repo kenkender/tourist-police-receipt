@@ -267,23 +267,41 @@ export default function SettingsPage() {
         </div>
 
         {/* System Info */}
+        {/* System Info & Admin Accounts */}
         <div className="glass-card" style={{ padding: '24px 28px' }}>
           <h3 style={{ fontSize: 15, fontWeight: 700, color: '#c9a84c', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
             <Shield size={15} />
-            ข้อมูลระบบ
+            ข้อมูลระบบ & สิทธิ์แอดมิน (Admin Accounts)
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 13 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, fontSize: 13, marginBottom: 16 }}>
             {[
-              ['ผู้ดูแลระบบปัจจุบัน', currentUser?.email],
-              ['สิทธิ์', 'ผู้ดูแลระบบ (Admin)'],
+              ['ผู้ใช้ปัจจุบัน', currentUser?.name || currentUser?.email],
+              ['สิทธิ์ของคุณ', 'ผู้ดูแลระบบ (Admin)'],
               ['ปีงบประมาณปัจจุบัน', FISCAL_YEAR + ' (พ.ศ. 25' + FISCAL_YEAR + ')'],
-              ['ระบบจัดเก็บข้อมูล', 'Local Storage + Google Sheets'],
+              ['ระบบจัดเก็บข้อมูล', 'Google Sheets + Local Sync'],
             ].map(([k, v]) => (
-              <div key={k} style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+              <div key={k} style={{ padding: '10px 14px', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ color: '#6b7a99', fontSize: 11, marginBottom: 4 }}>{k}</div>
                 <div style={{ color: '#e8edf5', fontWeight: 600 }}>{v}</div>
               </div>
             ))}
+          </div>
+
+          <div style={{
+            padding: '14px 18px', background: 'rgba(201,168,76,0.08)',
+            border: '1px solid rgba(201,168,76,0.25)', borderRadius: 10, fontSize: 12,
+          }}>
+            <div style={{ fontWeight: 700, color: '#c9a84c', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Shield size={14} /> รายชื่อบัญชีสิทธิ์ Admin ในระบบ:
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+              <span className="badge badge-gold">emptyken37@gmail.com</span>
+              <span className="badge badge-gold">kenkender</span>
+              <span className="badge badge-gold">adisorn sodchuen</span>
+            </div>
+            <div style={{ color: '#a8b5cc', fontSize: 11, lineHeight: 1.5 }}>
+              💡 ท่านสามารถเปิดดูหรือจัดการเพิ่ม/แก้ไขสิทธิ์ผู้ใช้งานทั้งหมดเพิ่มเติมได้ที่ Google Sheets แท็บ <strong>users</strong> (คอลัมน์ role = admin / issuer)
+            </div>
           </div>
         </div>
 
