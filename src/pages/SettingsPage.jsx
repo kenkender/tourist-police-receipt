@@ -296,6 +296,7 @@ export default function SettingsPage() {
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
               <span className="badge badge-gold">emptyken37@gmail.com</span>
+              <span className="badge badge-gold">pol.kensama@gmail.com</span>
               <span className="badge badge-gold">kenkender</span>
               <span className="badge badge-gold">adisorn sodchuen</span>
             </div>

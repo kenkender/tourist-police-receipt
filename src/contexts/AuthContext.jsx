@@ -11,16 +11,24 @@ export function AuthProvider({ children }) {
 
   // โหลด user จาก sessionStorage เมื่อ refresh หน้า
   useEffect(() => {
-    try {
-      const savedUser = sessionStorage.getItem('tp_current_user');
-      if (savedUser) {
-        setCurrentUser(JSON.parse(savedUser));
+    async function initUser() {
+      try {
+        const savedUserStr = sessionStorage.getItem('tp_current_user');
+        if (savedUserStr) {
+          const parsed = JSON.parse(savedUserStr);
+          // อัปเดตรอบใหม่สดๆ จาก Sheets เผื่อมีการเปลี่ยนสิทธิ์
+          const roleInfo = await fetchUserRoleFromSheets(parsed.email, parsed.name);
+          const updatedUser = { ...parsed, role: roleInfo.role };
+          setCurrentUser(updatedUser);
+          sessionStorage.setItem('tp_current_user', JSON.stringify(updatedUser));
+        }
+      } catch (e) {
+        sessionStorage.removeItem('tp_current_user');
+      } finally {
+        setLoading(false);
       }
-    } catch (e) {
-      sessionStorage.removeItem('tp_current_user');
-    } finally {
-      setLoading(false);
     }
+    initUser();
   }, []);
 
   // Helper สำหรับเช็กสิทธิ์จาก Google Sheets หรือ Admin Email List (รองรับทั้ง Email และ Display Name)
@@ -28,8 +36,8 @@ export function AuthProvider({ children }) {
     const cleanEmail = (email || '').toLowerCase().trim();
     const cleanName = (name || '').toLowerCase().trim();
 
-    // 1. เช็กสิทธิ์แอดมินล่วงหน้าจาก Environment Variables (ถ้ามี VITE_ADMIN_EMAILS)
-    const adminEmailsEnv = import.meta.env.VITE_ADMIN_EMAILS || 'emptyken37@gmail.com,adisorn sodchuen,adisorn,kenkender';
+    // 1. เช็กสิทธิ์แอดมินล่วงหน้าจาก Environment Variables (รวม pol.kensama@gmail.com)
+    const adminEmailsEnv = import.meta.env.VITE_ADMIN_EMAILS || 'emptyken37@gmail.com,pol.kensama@gmail.com,pol.kensama,เคน ฝอ.4,adisorn sodchuen,adisorn,kenkender';
     const adminList = adminEmailsEnv.split(',').map(e => e.toLowerCase().trim());
     if (adminList.some(item => (cleanEmail && cleanEmail.includes(item)) || (cleanName && cleanName.includes(item)))) {
       return { role: 'admin', name: cleanName || cleanEmail.split('@')[0] };
