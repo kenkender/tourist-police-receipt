@@ -235,6 +235,7 @@ export default function NewReceiptPage() {
 
       const savedNo = result.receipt.receiptNo;
       const nextNo = result.nextReceiptNo;
+      const currentBookNo = form.bookNo;
 
       setToast({
         msg: `บันทึกใบเสร็จ ${savedNo} (เล่มที่ ${currentBookNo}) สำเร็จแล้ว!`,
