@@ -5,6 +5,7 @@ import { ALL_PREFIX_GROUPS, DONATION_TYPES } from '../config/ranks';
 import { ORG_INFO, FISCAL_YEAR } from '../config/google.config';
 import { formatBaht, bahtToText, toThaiDate, todayISO } from '../services/utils';
 import ReceiptTemplate from '../components/receipt/ReceiptTemplate';
+import CustomModal from '../components/common/CustomModal';
 import {
   FilePlus, Save, Printer, ChevronDown,
   AlertCircle, CheckCircle, User, BookOpen, Calendar,
@@ -173,7 +174,11 @@ export default function NewReceiptPage() {
 
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
-  const [toast, setToast] = useState(null);
+
+  // Modal States
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [successModalData, setSuccessModalData] = useState(null);
+  const [errorModalData, setErrorModalData] = useState(null);
 
   const refreshNextNumber = (targetBookNo) => {
     const bNo = targetBookNo || form.bookNo || '1';
@@ -223,8 +228,15 @@ export default function NewReceiptPage() {
     return Object.keys(e).length === 0;
   };
 
-  const handleSave = async () => {
+  // เมื่อผู้ใช้กดปุ่มบันทึก -> เปิด Confirmation Modal ก่อน
+  const handleSaveClick = () => {
     if (!validate()) return;
+    setShowConfirmModal(true);
+  };
+
+  // ดำเนินการบันทึกจริงเมื่อยืนยันใน Modal
+  const executeSave = async () => {
+    setShowConfirmModal(false);
     setLoading(true);
     try {
       const result = await createReceipt({
@@ -233,13 +245,17 @@ export default function NewReceiptPage() {
         fiscalYear: FISCAL_YEAR,
       });
 
-      const savedNo = result.receipt.receiptNo;
+      const savedReceipt = result.receipt;
       const nextNo = result.nextReceiptNo;
       const currentBookNo = form.bookNo;
 
-      setToast({
-        msg: `บันทึกใบเสร็จ ${savedNo} (เล่มที่ ${currentBookNo}) สำเร็จแล้ว!`,
-        type: 'success',
+      // แสดง Success Modal กลางหน้าจอ
+      setSuccessModalData({
+        receiptNo: savedReceipt.receiptNo,
+        bookNo: currentBookNo,
+        receivedFrom: savedReceipt.receivedFrom,
+        amount: savedReceipt.amount,
+        nextNo: nextNo,
       });
 
       // ล้างฟอร์ม — คงค่า bookNo ที่ผู้ใช้กำลังใช้งานอยู่ไว้
@@ -265,7 +281,7 @@ export default function NewReceiptPage() {
       setTimeout(() => refreshNextNumber(currentBookNo), 2000);
 
     } catch (err) {
-      setToast({ msg: err.message, type: 'error' });
+      setErrorModalData(err.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
       refreshNextNumber(form.bookNo);
     } finally {
       setLoading(false);
@@ -299,7 +315,7 @@ export default function NewReceiptPage() {
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
             className="btn btn-gold btn-lg"
-            onClick={handleSave}
+            onClick={handleSaveClick}
             disabled={loading}
             style={{ padding: '12px 24px', fontSize: 15, fontWeight: 700 }}
           >
@@ -516,6 +532,55 @@ export default function NewReceiptPage() {
           </div>
         </div>
       </div>
+
+      {/* MODALS */}
+      {/* 1. Modal ยืนยันก่อนบันทึก */}
+      <CustomModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={executeSave}
+        type="confirm"
+        title="ยืนยันการบันทึกใบเสร็จ?"
+        message="กรุณาตรวจสอบความถูกต้องของข้อมูลก่อนบันทึกลงในระบบ"
+        details={[
+          { label: 'เล่มที่ / เลขที่', value: `${form.bookNo} / ${form.receiptNo}` },
+          { label: 'ได้รับเงินจาก', value: form.receivedFrom || '-' },
+          { label: 'รายการ', value: form.description },
+          { label: 'จำนวนเงิน', value: `฿${formatBaht(form.amount)}`, isBaht: true },
+          { label: 'ผู้ลงนาม', value: `${form.signerRank} ${form.signerName}` },
+        ]}
+        confirmText="ยืนยันบันทึกข้อมูล"
+        cancelText="ยกเลิก / แก้ไข"
+      />
+
+      {/* 2. Modal แจ้งเตือนเมื่อบันทึกสำเร็จ */}
+      <CustomModal
+        isOpen={!!successModalData}
+        onClose={() => setSuccessModalData(null)}
+        type="success"
+        title="บันทึกใบเสร็จสำเร็จแล้ว!"
+        message="ระบบทำการบันทึกข้อมูลลง Google Sheets เรียบร้อยแล้ว"
+        details={successModalData ? [
+          { label: 'เล่มที่ / เลขที่', value: `${successModalData.bookNo} / ${successModalData.receiptNo}` },
+          { label: 'ผู้บริจาค', value: successModalData.receivedFrom },
+          { label: 'จำนวนเงิน', value: `฿${formatBaht(successModalData.amount)}`, isBaht: true },
+          { label: 'ฉบับถัดไป', value: successModalData.nextNo },
+        ] : []}
+        confirmText="ตกลง"
+        showPrint={true}
+        onPrint={handleDirectPrint}
+      />
+
+      {/* 3. Modal แจ้งเตือนข้อผิดพลาด */}
+      <CustomModal
+        isOpen={!!errorModalData}
+        onClose={() => setErrorModalData(null)}
+        type="delete"
+        title="ไม่สามารถบันทึกข้อมูลได้"
+        message={errorModalData}
+        confirmText="ตกลง / ลองใหม่"
+        confirmBtnStyle="gold"
+      />
     </div>
   );
 }

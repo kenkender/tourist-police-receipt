@@ -3,6 +3,7 @@ import { useReceipts } from '../contexts/ReceiptContext';
 import { useAuth } from '../contexts/AuthContext';
 import { formatBaht, toThaiDateShort } from '../services/utils';
 import ReceiptTemplate from '../components/receipt/ReceiptTemplate';
+import CustomModal from '../components/common/CustomModal';
 import { getGoogleSheetUrl } from '../config/google.config';
 import {
   BookOpen, Search, RotateCcw, Printer,
@@ -19,6 +20,7 @@ export default function ReceiptListPage() {
   const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const PAGE_SIZE = 15;
 
   const filtered = useMemo(() => {
@@ -43,9 +45,14 @@ export default function ReceiptListPage() {
 
   const resetFilters = () => { setSearch(''); setStartDate(''); setEndDate(''); setPage(1); };
 
-  const handleDelete = (item) => {
-    if (confirm(`ยืนยันลบใบเสร็จเลขที่ ${item.receiptNo}?`)) {
-      deleteReceipt(item.id);
+  const handleDeleteClick = (item) => {
+    setDeleteTarget(item);
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteTarget) {
+      deleteReceipt(deleteTarget.id);
+      setDeleteTarget(null);
     }
   };
 
@@ -172,7 +179,7 @@ export default function ReceiptListPage() {
                       {isAdmin && (
                         <button
                           className="btn btn-danger btn-sm"
-                          onClick={() => handleDelete(item)}
+                          onClick={() => handleDeleteClick(item)}
                           title="ลบ"
                         >
                           <Trash2 size={13} />
