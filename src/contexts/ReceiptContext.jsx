@@ -28,6 +28,10 @@ function loadFromStorage(key, defaultValue) {
  * แปลง row จาก Google Sheets (snake_case) เป็น format ของ app (camelCase)
  */
 function mapSheetRowToReceipt(row) {
+  const rawStatus = String(row.status || row.Status || '').trim();
+  const rawDesc = String(row.description || '').trim();
+  const isCancelled = rawStatus === 'ยกเลิก' || rawStatus.toLowerCase() === 'cancelled' || rawDesc.includes('(ยกเลิก)');
+
   return {
     // ใช้ receipt_no + book_no เป็น id เพื่อให้ merge กับ localStorage ได้
     id: `SHEET-${String(row.receipt_no)}-${String(row.book_no)}`,
@@ -43,7 +47,7 @@ function mapSheetRowToReceipt(row) {
     issuerEmail: row.issuer_email || '',
     issuerName: row.issuer_name || '',
     createdAt: row.created_at || new Date().toISOString(),
-    status: row.status || 'ใช้งาน',
+    status: isCancelled ? 'ยกเลิก' : 'ใช้งาน',
   };
 }
 
@@ -105,9 +109,27 @@ export function ReceiptProvider({ children }) {
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Sheets ตอบกลับผิดพลาด');
 
-      const mapped = (json.data || [])
+      const map = new Map();
+      (json.data || [])
         .filter(row => row.receipt_no) // กรองแถวว่าง
-        .map(mapSheetRowToReceipt)
+        .forEach(row => {
+          const item = mapSheetRowToReceipt(row);
+          const key = `${item.bookNo}-${item.receiptNo}`;
+          if (!map.has(key)) {
+            map.set(key, item);
+          } else {
+            const existing = map.get(key);
+            // หากมีแถวใดแถวหนึ่ง (เช่น แถวใหม่ที่เพิ่งเพิ่มเข้ามา) มีสถานะเป็น "ยกเลิก" ให้ยึดถือว่าใบเสร็จนี้ถูกยกเลิกแล้ว
+            if (item.status === 'ยกเลิก') {
+              existing.status = 'ยกเลิก';
+              if (item.description && item.description.includes('(ยกเลิก)')) {
+                existing.description = item.description;
+              }
+            }
+          }
+        });
+
+      const mapped = Array.from(map.values())
         // เรียงจากใหม่สุดไปเก่าสุด
         .sort((a, b) => b.receiptNo.localeCompare(a.receiptNo));
 
@@ -326,25 +348,48 @@ export function ReceiptProvider({ children }) {
     setReceipts(prev => {
       const target = prev.find(r => r.id === id);
       if (!target) return prev;
-      const updated = prev.map(r => r.id === id ? { ...r, status: 'ยกเลิก' } : r);
+
+      const cancelDesc = target.description
+        ? (target.description.includes('(ยกเลิก)') ? target.description : `${target.description} (ยกเลิก)`)
+        : 'ยกเลิกใบเสร็จ';
+
+      const updated = prev.map(r => r.id === id ? { ...r, status: 'ยกเลิก', description: cancelDesc } : r);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
 
       const scriptUrl = GOOGLE_CONFIG.APPS_SCRIPT_URL;
       if (scriptUrl) {
+        const payload = {
+          receiptNo: target.receiptNo,
+          bookNo: target.bookNo,
+          date: target.date,
+          receivedFrom: target.receivedFrom,
+          description: cancelDesc,
+          amount: target.amount,
+          signerName: target.signerName,
+          signerPosition: target.signerPosition,
+          signerRank: target.signerRank,
+          issuerEmail: target.issuerEmail,
+          issuerName: target.issuerName,
+          status: 'ยกเลิก',
+        };
+
+        // 1. เรียก action: cancelReceipt (สำหรับ Apps Script เวอร์ชันใหม่)
         fetch(scriptUrl, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({
-            action: 'cancelReceipt',
-            receiptNo: target.receiptNo,
-            bookNo: target.bookNo,
-          }),
+          body: JSON.stringify({ action: 'cancelReceipt', ...payload }),
+        }).catch(err => console.warn('[Cancel] notice:', err));
+
+        // 2. เรียก action: saveReceipt พร้อม status 'ยกเลิก' (การันตีเพิ่มแถวใหม่ลง Google Sheets 100% แม้เป็น Apps Script เดิม)
+        fetch(scriptUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ action: 'saveReceipt', ...payload }),
         }).then(() => {
           setTimeout(() => syncFromSheets(true), 2000);
-        }).catch(err => {
-          console.warn('[Cancel] Sheets sync notice:', err);
-        });
+        }).catch(err => console.warn('[Cancel-Save] notice:', err));
       }
 
       return updated;

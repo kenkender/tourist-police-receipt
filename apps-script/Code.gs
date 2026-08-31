@@ -195,7 +195,7 @@ function saveReceipt(data, headers) {
 
 
 /**
- * อัปเดตสถานะยกเลิกใบเสร็จใน Google Sheets
+ * อัปเดตสถานะและเพิ่มแถวบันทึกการยกเลิกใบเสร็จใน Google Sheets
  */
 function cancelReceiptInSheet(data, headers) {
   try {
@@ -212,6 +212,7 @@ function cancelReceiptInSheet(data, headers) {
       sheet.getRange(1, statusColIndex + 1).setValue('status').setFontWeight('bold').setBackground('#1e3a8a').setFontColor('#ffffff');
     }
 
+    let foundRow = null;
     for (let i = existing.length - 1; i >= 1; i--) {
       const rowReceiptNo = String(existing[i][0]).trim();
       const rowBookNo = String(existing[i][1]).trim();
@@ -219,10 +220,29 @@ function cancelReceiptInSheet(data, headers) {
       if (rowReceiptNo === String(data.receiptNo).trim() &&
           (!data.bookNo || rowBookNo === String(data.bookNo).trim())) {
         sheet.getRange(i + 1, statusColIndex + 1).setValue('ยกเลิก');
-        return response({ success: true, message: 'อัปเดตสถานะยกเลิกใน Sheets เรียบร้อย' }, headers);
+        if (!foundRow) foundRow = existing[i];
       }
     }
-    return response({ success: true, message: 'ไม่พบรายการที่ต้องการยกเลิกใน Sheets' }, headers);
+
+    // เพิ่มแถวใหม่สถานะยกเลิกตามความต้องการของผู้ใช้
+    const cancelRow = [
+      String(data.receiptNo).trim(),
+      String(data.bookNo || '1').trim(),
+      data.date || (foundRow ? foundRow[2] : ''),
+      data.receivedFrom || (foundRow ? foundRow[3] : ''),
+      data.description ? (String(data.description).includes('(ยกเลิก)') ? data.description : `${data.description} (ยกเลิก)`) : (foundRow ? `${foundRow[4]} (ยกเลิก)` : 'ยกเลิกใบเสร็จ'),
+      data.amount || (foundRow ? foundRow[5] : 0),
+      data.signerName || (foundRow ? foundRow[6] : ''),
+      data.signerPosition || (foundRow ? foundRow[7] : ''),
+      data.signerRank || (foundRow ? foundRow[8] : ''),
+      data.issuerEmail || (foundRow ? foundRow[9] : ''),
+      data.issuerName || (foundRow ? foundRow[10] : ''),
+      new Date().toISOString(),
+      'ยกเลิก',
+    ];
+    sheet.appendRow(cancelRow);
+
+    return response({ success: true, message: 'บันทึกสถานะและเพิ่มแถวยกเลิกใน Sheets เรียบร้อย' }, headers);
   } catch (err) {
     return response({ success: false, error: err.message }, headers);
   }
