@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import ParticleBackground from '../components/three/ParticleBackground';
 import { PoliceEmblem } from '../components/layout/Navbar';
-import { Shield } from 'lucide-react';
+import { Shield, RefreshCw } from 'lucide-react';
 import { GOOGLE_CONFIG, LINE_CONFIG } from '../config/google.config';
 
 export default function LoginPage() {
@@ -11,6 +11,26 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
+
+  const LOADING_MESSAGES = [
+    'กำลังตรวจสอบสิทธิ์การเข้าใช้งาน...',
+    'กำลังเชื่อมต่อฐานข้อมูลระบบ...',
+    'กำลังดึงข้อมูลใบเสร็จรับเงิน...',
+    'กำลังเตรียมความพร้อมระบบ กรุณารอสักครู่...',
+  ];
+
+  useEffect(() => {
+    let interval;
+    if (loading) {
+      interval = setInterval(() => {
+        setLoadingMsgIndex(prev => (prev + 1) % LOADING_MESSAGES.length);
+      }, 1600);
+    } else {
+      setLoadingMsgIndex(0);
+    }
+    return () => clearInterval(interval);
+  }, [loading]);
 
   // โหลด Google GIS และ LINE LIFF SDK ในลักษณะ Dynamic
   useEffect(() => {
@@ -266,6 +286,93 @@ export default function LoginPage() {
           <Shield size={10} />
           ระบบจัดเก็บข้อมูลกลาง เชื่อมต่อฐานข้อมูลปลอดภัย
         </div>
+
+        {/* High-End Glassmorphism Loading Overlay */}
+        {loading && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(6, 15, 32, 0.92)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            borderRadius: 24,
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            padding: 32, zIndex: 50,
+            animation: 'fadeIn 0.3s ease-out',
+          }}>
+            {/* Animated Emblem with Dual Spinning Ring */}
+            <div style={{ position: 'relative', marginBottom: 20 }}>
+              {/* Outer Spinning Ring */}
+              <div style={{
+                position: 'absolute', top: -14, left: -14, right: -14, bottom: -14,
+                borderRadius: '50%',
+                border: '3px solid transparent',
+                borderTopColor: '#c9a84c',
+                borderRightColor: 'rgba(201, 168, 76, 0.3)',
+                animation: 'spin-slow 1.2s linear infinite',
+              }} />
+              {/* Inner Counter-Spinning Ring */}
+              <div style={{
+                position: 'absolute', top: -6, left: -6, right: -6, bottom: -6,
+                borderRadius: '50%',
+                border: '2px solid transparent',
+                borderBottomColor: '#3b7dd8',
+                borderLeftColor: 'rgba(59, 125, 216, 0.3)',
+                animation: 'spin-slow 2s linear infinite reverse',
+              }} />
+              
+              <div style={{
+                animation: 'pulse-gold 2s ease-in-out infinite, float 3s ease-in-out infinite',
+                filter: 'drop-shadow(0 0 20px rgba(201,168,76,0.6))',
+              }}>
+                <PoliceEmblem size={64} />
+              </div>
+            </div>
+
+            {/* Title */}
+            <h3 style={{
+              fontSize: 16, fontWeight: 800, color: '#e8edf5',
+              marginBottom: 8, textAlign: 'center', letterSpacing: '-0.01em'
+            }}>
+              กำลังเข้าสู่ระบบ...
+            </h3>
+
+            {/* Dynamic Status Message with fade effect */}
+            <div style={{
+              fontSize: 13, color: '#c9a84c', fontWeight: 600,
+              marginBottom: 12, textAlign: 'center', minHeight: 24,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}>
+              <RefreshCw size={14} style={{ animation: 'spin-slow 1s linear infinite' }} />
+              <span>{LOADING_MESSAGES[loadingMsgIndex]}</span>
+            </div>
+
+            {/* Subtext */}
+            <div style={{
+              fontSize: 11, color: '#6b7a99', textAlign: 'center',
+              maxWidth: 280, lineHeight: 1.5, marginBottom: 20,
+            }}>
+              ระบบกำลังดึงข้อมูลอย่างปลอดภัย ใช้เวลาสักครู่นะครับ ✨
+            </div>
+
+            {/* Glowing Progress Bar */}
+            <div style={{
+              width: '100%', maxWidth: 220, height: 4,
+              background: 'rgba(255, 255, 255, 0.1)',
+              borderRadius: 999, overflow: 'hidden',
+              position: 'relative',
+            }}>
+              <div style={{
+                position: 'absolute', top: 0, bottom: 0, left: 0,
+                width: '70%',
+                background: 'linear-gradient(90deg, #3b7dd8, #c9a84c, #3b7dd8)',
+                backgroundSize: '200% 100%',
+                borderRadius: 999,
+                animation: 'shimmer 1.5s ease-in-out infinite',
+              }} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
