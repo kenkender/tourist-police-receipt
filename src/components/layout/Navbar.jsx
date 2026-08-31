@@ -1,10 +1,83 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useReceiptsOptional } from '../../contexts/ReceiptContext';
+
 import {
-  FileText, BookOpen, BarChart2, Settings, LogOut, Menu, X, Shield, HelpCircle
+  FileText, BookOpen, BarChart2, Settings, LogOut, Menu, X, Shield, HelpCircle,
+  RefreshCw, WifiOff, CheckCircle2,
 } from 'lucide-react';
 import { useState } from 'react';
 import UserManualModal from '../manual/UserManualModal';
+
+// ── แสดงสถานะการ Sync กับ Google Sheets ────────────────────────────────────
+function SyncStatusBadge() {
+  const ctx = useReceiptsOptional();
+  if (!ctx) return null;
+  const { isSyncing, lastSyncTime, syncError, syncFromSheets } = ctx;
+
+  const formatTime = (date) => {
+    if (!date) return null;
+    return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  };
+
+  if (isSyncing) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 5,
+        padding: '3px 10px', borderRadius: 20,
+        background: 'rgba(201,168,76,0.15)',
+        border: '1px solid rgba(201,168,76,0.3)',
+        fontSize: 11, color: '#c9a84c',
+      }}>
+        <RefreshCw size={11} style={{ animation: 'spin-slow 1s linear infinite' }} />
+        <span>กำลัง Sync...</span>
+      </div>
+    );
+  }
+
+  if (syncError) {
+    return (
+      <button
+        onClick={() => syncFromSheets()}
+        title={`Sync ล้มเหลว: ${syncError} — คลิกเพื่อลองใหม่`}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 5,
+          padding: '3px 10px', borderRadius: 20,
+          background: 'rgba(220,50,50,0.15)',
+          border: '1px solid rgba(220,50,50,0.4)',
+          fontSize: 11, color: '#ff7070',
+          cursor: 'pointer',
+        }}
+      >
+        <WifiOff size={11} />
+        <span>Sync ล้มเหลว</span>
+      </button>
+    );
+  }
+
+  if (lastSyncTime) {
+    return (
+      <button
+        onClick={() => syncFromSheets()}
+        title={`Sync ล่าสุด: ${formatTime(lastSyncTime)} — คลิกเพื่อ Sync ทันที`}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 5,
+          padding: '3px 10px', borderRadius: 20,
+          background: 'rgba(34,197,94,0.12)',
+          border: '1px solid rgba(34,197,94,0.3)',
+          fontSize: 11, color: '#4ade80',
+          cursor: 'pointer',
+        }}
+      >
+        <CheckCircle2 size={11} />
+        <span className="hide-mobile">Sync {formatTime(lastSyncTime)}</span>
+        <span className="hide-desktop">Sync แล้ว</span>
+      </button>
+    );
+  }
+
+  return null;
+}
 
 // โลโก้ บช.ทท. จริง (ภาพตราตำรวจท่องเที่ยว)
 export function PoliceEmblem({ size = 40, className = '' }) {
@@ -133,6 +206,13 @@ export default function Navbar() {
               คู่มือการใช้งาน
             </button>
           </nav>
+
+          {/* Sync Status */}
+          {currentUser && (
+            <div className="hide-mobile">
+              <SyncStatusBadge />
+            </div>
+          )}
 
           {/* User Info + Logout */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

@@ -142,6 +142,8 @@ function getUserRole(email, name, headers) {
 
 /**
  * ขอเลขใบเสร็จถัดไป — ใช้ LockService เพื่อป้องกัน Race Condition
+ * [แก้ไข] ตรวจสอบเลขสูงสุดจาก receipts sheet จริงก่อนเสมอ
+ *         เพื่อป้องกัน counter ให้เลขที่ซ้ำกับที่มีอยู่แล้ว
  */
 function getNextReceiptNumber(e, headers) {
   const lock = LockService.getScriptLock();
@@ -153,41 +155,59 @@ function getNextReceiptNumber(e, headers) {
 
   try {
     const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    const sheet = ss.getSheetByName(COUNTER_SHEET);
+    const fiscalYear = (e && e.parameter && e.parameter.year) ? e.parameter.year : getFiscalYear();
 
-    if (!sheet) {
-      initCounterSheet(ss);
-      return getNextReceiptNumber(e, headers);
+    // ─── 1. หาเลขสูงสุดจาก receipts sheet (แหล่งข้อมูลจริง) ─────────────────
+    let maxFromReceipts = 0;
+    const receiptsSheet = ss.getSheetByName(RECEIPTS_SHEET);
+    if (receiptsSheet && receiptsSheet.getLastRow() > 1) {
+      const rData = receiptsSheet.getDataRange().getValues();
+      for (let i = 1; i < rData.length; i++) {
+        const rno = String(rData[i][0] || '').trim();
+        if (rno.startsWith(fiscalYear + '-')) {
+          const num = parseInt(rno.split('-')[1], 10);
+          if (!isNaN(num) && num > maxFromReceipts) maxFromReceipts = num;
+        }
+      }
     }
 
-    const fiscalYear = (e && e.parameter && e.parameter.year) ? e.parameter.year : getFiscalYear();
-    const data = sheet.getDataRange().getValues();
-
-    let rowIndex = -1;
-    for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === String(fiscalYear)) {
-        rowIndex = i + 1;
+    // ─── 2. หาเลขจาก counter sheet ───────────────────────────────────────────
+    let maxFromCounter = 0;
+    let counterRowIndex = -1;
+    let counterSheet = ss.getSheetByName(COUNTER_SHEET);
+    if (!counterSheet) {
+      initCounterSheet(ss);
+      counterSheet = ss.getSheetByName(COUNTER_SHEET);
+    }
+    const cData = counterSheet.getDataRange().getValues();
+    for (let i = 1; i < cData.length; i++) {
+      if (String(cData[i][0]) === String(fiscalYear)) {
+        counterRowIndex = i + 1; // 1-indexed
+        maxFromCounter = parseInt(cData[i][1], 10) || 0;
         break;
       }
     }
 
-    let lastNumber = 0;
+    // ─── 3. nextNumber = MAX(receipts, counter) + 1 ───────────────────────────
+    //        ทำให้มั่นใจว่าไม่ซ้ำกับที่มีใน sheet อยู่แล้วเสมอ
+    const currentMax = Math.max(maxFromReceipts, maxFromCounter);
+    const nextNumber = currentMax + 1;
 
-    if (rowIndex === -1) {
-      sheet.appendRow([fiscalYear, 1, new Date()]);
-      lastNumber = 1;
+    // ─── 4. บันทึก nextNumber ลง counter เพื่อ "จอง" เลขนี้ไว้ ──────────────
+    //        เครื่องที่ 2 ที่เรียกถัดไปจะได้เลขต่อไปเสมอ
+    if (counterRowIndex === -1) {
+      counterSheet.appendRow([fiscalYear, nextNumber, new Date()]);
     } else {
-      lastNumber = parseInt(sheet.getRange(rowIndex, 2).getValue()) + 1;
-      sheet.getRange(rowIndex, 2).setValue(lastNumber);
-      sheet.getRange(rowIndex, 3).setValue(new Date());
+      counterSheet.getRange(counterRowIndex, 2).setValue(nextNumber);
+      counterSheet.getRange(counterRowIndex, 3).setValue(new Date());
     }
 
-    const receiptNo = `${fiscalYear}-${String(lastNumber).padStart(5, '0')}`;
+    const receiptNo = fiscalYear + '-' + String(nextNumber).padStart(5, '0');
 
     return response({
       success: true,
       receiptNo: receiptNo,
-      number: lastNumber,
+      number: nextNumber,
       year: fiscalYear,
     }, headers);
 

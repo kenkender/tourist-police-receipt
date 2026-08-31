@@ -237,10 +237,11 @@ export default function NewReceiptPage() {
         type: 'success',
       });
 
-      // ล้างฟอร์ม และใส่ค่าเริ่มต้นเจ้าหน้าที่ลงนามให้อัตโนมัติ
+      // ล้างฟอร์ม — คงค่า bookNo ที่ผู้ใช้กำลังใช้งานอยู่ไว้
       const activeDefault = signers.find(s => s.isDefault) || signers[0] || ORG_INFO.defaultSigner;
+      const currentBookNo = form.bookNo; // คงเล่มที่ใช้งานอยู่
       setForm({
-        bookNo: settings.defaultBookNo || '1',
+        bookNo: currentBookNo,  // ← คงค่าเดิม ไม่ reset กลับเป็น default
         receiptNo: nextNo,
         date: todayISO(),
         prefix: '',
@@ -255,6 +256,9 @@ export default function NewReceiptPage() {
         signerPosition: activeDefault.position || ORG_INFO.defaultSigner.position,
       });
       setErrors({});
+
+      // โหลดเลขที่ถัดไปจาก Sheets ใหม่ (ใช้เวลา 2-3 วิ. หลัง Sheets อัปเดต)
+      setTimeout(() => refreshNextNumber(), 3000);
 
     } catch (err) {
       setToast({ msg: err.message, type: 'error' });

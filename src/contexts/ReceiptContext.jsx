@@ -2,10 +2,12 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { FISCAL_YEAR, GOOGLE_CONFIG, ORG_INFO } from '../config/google.config';
 import { useAuth } from './AuthContext';
 
-const ReceiptContext = createContext(null);
+export const ReceiptContext = createContext(null);
+
 
 const STORAGE_KEY = 'tp_receipts_v2';
 const SETTINGS_KEY = 'tp_settings_v2';
+const SYNC_INTERVAL_MS = 30000; // polling ทุก 30 วินาที
 
 const DEFAULT_SIGNERS = [
   { id: 'signer-1', name: 'รัชฎาพร ราชกิจ', rank: 'พ.ต.อ.หญิง', position: 'เหรัญญิก', isDefault: true },
@@ -22,9 +24,33 @@ function loadFromStorage(key, defaultValue) {
   }
 }
 
+/**
+ * แปลง row จาก Google Sheets (snake_case) เป็น format ของ app (camelCase)
+ */
+function mapSheetRowToReceipt(row) {
+  return {
+    // ใช้ receipt_no + book_no เป็น id เพื่อให้ merge กับ localStorage ได้
+    id: `SHEET-${String(row.receipt_no)}-${String(row.book_no)}`,
+    receiptNo: String(row.receipt_no || ''),
+    bookNo: String(row.book_no || ''),
+    date: row.date || '',
+    receivedFrom: row.received_from || '',
+    description: row.description || '',
+    amount: Number(row.amount) || 0,
+    signerName: row.signer_name || '',
+    signerPosition: row.signer_position || '',
+    signerRank: row.signer_rank || '',
+    issuerEmail: row.issuer_email || '',
+    issuerName: row.issuer_name || '',
+    createdAt: row.created_at || new Date().toISOString(),
+    status: 'active',
+  };
+}
+
 export function ReceiptProvider({ children }) {
   const { currentUser } = useAuth();
 
+  // โหลด receipts จาก localStorage เป็น initial state (จะถูก overwrite โดย Sheets sync เร็วๆ นี้)
   const [receipts, setReceipts] = useState(() =>
     loadFromStorage(STORAGE_KEY, [])
   );
@@ -48,51 +74,139 @@ export function ReceiptProvider({ children }) {
     };
   });
 
+  // สถานะ sync
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+  const [syncError, setSyncError] = useState(null);
+
   const lockRef = useRef(false);
+  const syncTimerRef = useRef(null);
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(receipts));
-  }, [receipts]);
-
+  // บันทึก settings ลง localStorage เมื่อเปลี่ยน
   useEffect(() => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
   }, [settings]);
 
-  useEffect(() => {
-    const handleStorage = (e) => {
-      if (e.key === STORAGE_KEY && e.newValue) {
-        try { setReceipts(JSON.parse(e.newValue)); } catch {}
-      }
-      if (e.key === SETTINGS_KEY && e.newValue) {
-        try { setSettings(JSON.parse(e.newValue)); } catch {}
-      }
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+  // ─── Core: ดึงข้อมูลทั้งหมดจาก Google Sheets ─────────────────────────────
+  const syncFromSheets = useCallback(async (silent = false) => {
+    const scriptUrl = GOOGLE_CONFIG.APPS_SCRIPT_URL;
+    if (!scriptUrl) return false;
+
+    if (!silent) setIsSyncing(true);
+    setSyncError(null);
+
+    try {
+      const res = await fetch(`${scriptUrl}?action=getReceipts`, {
+        method: 'GET',
+        cache: 'no-store',
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Sheets ตอบกลับผิดพลาด');
+
+      const mapped = (json.data || [])
+        .filter(row => row.receipt_no) // กรองแถวว่าง
+        .map(mapSheetRowToReceipt)
+        // เรียงจากใหม่สุดไปเก่าสุด
+        .sort((a, b) => b.receiptNo.localeCompare(a.receiptNo));
+
+      setReceipts(mapped);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
+      setLastSyncTime(new Date());
+      return true;
+    } catch (err) {
+      console.warn('[Sync] ดึงข้อมูลจาก Sheets ล้มเหลว:', err.message);
+      setSyncError(err.message);
+      return false;
+    } finally {
+      if (!silent) setIsSyncing(false);
+    }
   }, []);
 
-  // คำนวณเลขใบเสร็จถัดไปจากรายการใบเสร็จที่มีอยู่จริงแบบไดนามิก
+  // ─── Sync ครั้งแรกเมื่อ mount ─────────────────────────────────────────────
+  useEffect(() => {
+    syncFromSheets();
+  }, [syncFromSheets]);
+
+  // ─── Polling ทุก 30 วินาที ─────────────────────────────────────────────────
+  useEffect(() => {
+    const startPolling = () => {
+      syncTimerRef.current = setInterval(() => {
+        syncFromSheets(true); // silent = ไม่แสดง loading spinner
+      }, SYNC_INTERVAL_MS);
+    };
+
+    // เริ่ม polling เมื่อ tab กลับมา focus
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncFromSheets(true); // sync ทันทีเมื่อกลับมา
+      }
+    };
+
+    startPolling();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (syncTimerRef.current) clearInterval(syncTimerRef.current);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [syncFromSheets]);
+
+  // ─── คำนวณเลขใบเสร็จถัดไป (ใช้เพื่อแสดงผล preview เท่านั้น) ───────────────
   const getNextReceiptNumber = useCallback(async () => {
-    const latestReceipts = loadFromStorage(STORAGE_KEY, receipts);
     const latestSettings = loadFromStorage(SETTINGS_KEY, settings);
     const year = latestSettings.fiscalYear || FISCAL_YEAR;
 
-    let maxNumber = 0;
-    latestReceipts.forEach(r => {
-      if (r.receiptNo && r.receiptNo.startsWith(`${year}-`)) {
-        const parts = r.receiptNo.split('-');
-        const num = parseInt(parts[1], 10);
-        if (!isNaN(num) && num > maxNumber) {
-          maxNumber = num;
+    // ลองดึงจาก Sheets ก่อน (เพื่อให้เลขล่าสุดที่แม่นยำ)
+    const scriptUrl = GOOGLE_CONFIG.APPS_SCRIPT_URL;
+    if (scriptUrl) {
+      try {
+        const res = await fetch(`${scriptUrl}?action=getReceipts`, {
+          method: 'GET',
+          cache: 'no-store',
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.data)) {
+            let maxNumber = 0;
+            json.data.forEach(row => {
+              const rno = String(row.receipt_no || '');
+              if (rno.startsWith(`${year}-`)) {
+                const num = parseInt(rno.split('-')[1], 10);
+                if (!isNaN(num) && num > maxNumber) maxNumber = num;
+              }
+            });
+            const nextNo = maxNumber + 1;
+            return {
+              number: nextNo,
+              formatted: `${year}-${String(nextNo).padStart(5, '0')}`,
+              year,
+            };
+          }
         }
+      } catch {
+        // fallback ไปใช้ local
+      }
+    }
+
+    // Fallback: คำนวณจาก local state
+    let maxNumber = 0;
+    receipts.forEach(r => {
+      if (r.receiptNo && r.receiptNo.startsWith(`${year}-`)) {
+        const num = parseInt(r.receiptNo.split('-')[1], 10);
+        if (!isNaN(num) && num > maxNumber) maxNumber = num;
       }
     });
-
     const nextNo = maxNumber + 1;
-    const formatted = `${year}-${String(nextNo).padStart(5, '0')}`;
-    return { number: nextNo, formatted, year };
+    return {
+      number: nextNo,
+      formatted: `${year}-${String(nextNo).padStart(5, '0')}`,
+      year,
+    };
   }, [receipts, settings]);
 
+  // ─── บันทึกใบเสร็จใหม่ ─────────────────────────────────────────────────────
   const createReceipt = useCallback(async (formData) => {
     if (lockRef.current) {
       throw new Error('ระบบกำลังประมวลผลการบันทึก กรุณารอสักครู่');
@@ -100,24 +214,44 @@ export function ReceiptProvider({ children }) {
     lockRef.current = true;
 
     try {
-      const latestReceipts = loadFromStorage(STORAGE_KEY, receipts);
+      const scriptUrl = GOOGLE_CONFIG.APPS_SCRIPT_URL;
       const latestSettings = loadFromStorage(SETTINGS_KEY, settings);
       const year = latestSettings.fiscalYear || FISCAL_YEAR;
 
-      let maxNumber = 0;
-      latestReceipts.forEach(r => {
-        if (r.receiptNo && r.receiptNo.startsWith(`${year}-`)) {
-          const parts = r.receiptNo.split('-');
-          const num = parseInt(parts[1], 10);
-          if (!isNaN(num) && num > maxNumber) maxNumber = num;
-        }
-      });
+      let finalReceiptNo;
+      let finalNumber;
 
-      const finalNumber = maxNumber + 1;
-      const finalReceiptNo = `${year}-${String(finalNumber).padStart(5, '0')}`;
+      if (scriptUrl) {
+        // ─── ขอเลขที่ใบเสร็จจาก Server พร้อม Lock ป้องกัน race condition ───
+        try {
+          const res = await fetch(`${scriptUrl}?action=nextNumber&year=${year}`, {
+            method: 'GET',
+            cache: 'no-store',
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const json = await res.json();
+          if (!json.success) throw new Error(json.error || 'ขอเลขที่ใบเสร็จล้มเหลว');
+          finalReceiptNo = json.receiptNo;
+          finalNumber = json.number;
+        } catch (err) {
+          throw new Error(`ไม่สามารถขอเลขที่ใบเสร็จได้: ${err.message}`);
+        }
+      } else {
+        // Fallback: คำนวณเลขจาก local
+        const latestReceipts = loadFromStorage(STORAGE_KEY, receipts);
+        let maxNumber = 0;
+        latestReceipts.forEach(r => {
+          if (r.receiptNo && r.receiptNo.startsWith(`${year}-`)) {
+            const num = parseInt(r.receiptNo.split('-')[1], 10);
+            if (!isNaN(num) && num > maxNumber) maxNumber = num;
+          }
+        });
+        finalNumber = maxNumber + 1;
+        finalReceiptNo = `${year}-${String(finalNumber).padStart(5, '0')}`;
+      }
 
       const newReceipt = {
-        id: `REC-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        id: `SHEET-${finalReceiptNo}-${formData.bookNo}`,
         ...formData,
         receiptNo: finalReceiptNo,
         issuerEmail: currentUser?.email || 'system',
@@ -126,16 +260,14 @@ export function ReceiptProvider({ children }) {
         status: 'active',
       };
 
-      const updatedReceipts = [newReceipt, ...latestReceipts];
-      setReceipts(updatedReceipts);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedReceipts));
+      // ─── บันทึกลง local state ก่อนเพื่อ UX ที่ดี ───────────────────────────
+      setReceipts(prev => {
+        const updated = [newReceipt, ...prev.filter(r => r.receiptNo !== finalReceiptNo)];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        return updated;
+      });
 
-      const nextNo = finalNumber + 1;
-      const updatedSettings = { ...latestSettings, nextReceiptNo: nextNo };
-      setSettings(updatedSettings);
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(updatedSettings));
-
-      const scriptUrl = GOOGLE_CONFIG.APPS_SCRIPT_URL;
+      // ─── ส่งไป Google Sheets (fire-and-forget) ─────────────────────────────
       if (scriptUrl) {
         fetch(scriptUrl, {
           method: 'POST',
@@ -145,43 +277,29 @@ export function ReceiptProvider({ children }) {
             action: 'saveReceipt',
             ...newReceipt,
           }),
+        }).then(() => {
+          // sync กลับหลังบันทึก 2 วินาที เพื่อให้ Sheets อัปเดตก่อน
+          setTimeout(() => syncFromSheets(true), 2000);
         }).catch(err => {
-          console.warn('Google Sheets sync notice:', err);
+          console.warn('[Save] Google Sheets sync notice:', err);
         });
       }
 
+      const nextNo = finalNumber + 1;
       const nextFormatted = `${year}-${String(nextNo).padStart(5, '0')}`;
       return { receipt: newReceipt, nextReceiptNo: nextFormatted };
     } finally {
       lockRef.current = false;
     }
-  }, [receipts, currentUser, settings]);
+  }, [receipts, currentUser, settings, syncFromSheets]);
 
-  // ลบใบเสร็จพร้อมคำนวณและปรับลดเลขที่ใบเสร็จถัดไปให้อัตโนมัติ และลบแถวใน Google Sheets
+  // ─── ลบใบเสร็จ ─────────────────────────────────────────────────────────────
   const deleteReceipt = useCallback((id) => {
     setReceipts(prev => {
       const target = prev.find(r => r.id === id);
       const updated = prev.filter(r => r.id !== id);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
 
-      const year = settings.fiscalYear || FISCAL_YEAR;
-      let maxNumber = 0;
-      updated.forEach(r => {
-        if (r.receiptNo && r.receiptNo.startsWith(`${year}-`)) {
-          const parts = r.receiptNo.split('-');
-          const num = parseInt(parts[1], 10);
-          if (!isNaN(num) && num > maxNumber) maxNumber = num;
-        }
-      });
-
-      const recalculatedNextNo = maxNumber + 1;
-      setSettings(prevSettings => {
-        const updatedSettings = { ...prevSettings, nextReceiptNo: recalculatedNextNo };
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(updatedSettings));
-        return updatedSettings;
-      });
-
-      // ส่งคำขอลบไปยัง Google Sheets
       const scriptUrl = GOOGLE_CONFIG.APPS_SCRIPT_URL;
       if (target && scriptUrl) {
         fetch(scriptUrl, {
@@ -193,14 +311,16 @@ export function ReceiptProvider({ children }) {
             receiptNo: target.receiptNo,
             bookNo: target.bookNo,
           }),
+        }).then(() => {
+          setTimeout(() => syncFromSheets(true), 2000);
         }).catch(err => {
-          console.warn('Google Sheets sync delete notice:', err);
+          console.warn('[Delete] Sheets sync notice:', err);
         });
       }
 
       return updated;
     });
-  }, [settings]);
+  }, [syncFromSheets]);
 
   const updateSettings = useCallback((newSettings) => {
     setSettings(prev => {
@@ -210,7 +330,6 @@ export function ReceiptProvider({ children }) {
     });
   }, []);
 
-  // เพิ่มผู้รับเงินใหม่
   const addSigner = useCallback((signer) => {
     setSettings(prev => {
       const newSigners = [...(prev.signers || []), { ...signer, id: `signer-${Date.now()}` }];
@@ -220,7 +339,6 @@ export function ReceiptProvider({ children }) {
     });
   }, []);
 
-  // ลบผู้รับเงิน
   const removeSigner = useCallback((id) => {
     setSettings(prev => {
       const newSigners = (prev.signers || []).filter(s => s.id !== id);
@@ -230,7 +348,6 @@ export function ReceiptProvider({ children }) {
     });
   }, []);
 
-  // ตั้งเป็น Default Signer
   const setDefaultSigner = useCallback((id) => {
     setSettings(prev => {
       const newSigners = (prev.signers || []).map(s => ({
@@ -286,6 +403,10 @@ export function ReceiptProvider({ children }) {
   const value = {
     receipts,
     settings,
+    isSyncing,
+    lastSyncTime,
+    syncError,
+    syncFromSheets,
     createReceipt,
     deleteReceipt,
     updateSettings,
@@ -305,4 +426,9 @@ export function useReceipts() {
   const ctx = useContext(ReceiptContext);
   if (!ctx) throw new Error('useReceipts must be used within ReceiptProvider');
   return ctx;
+}
+
+// ใช้ในกรณีที่ไม่แน่ใจว่าอยู่ใน Provider หรือไม่ (เช่น Navbar ก่อน login)
+export function useReceiptsOptional() {
+  return useContext(ReceiptContext);
 }
