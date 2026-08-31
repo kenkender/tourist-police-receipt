@@ -294,6 +294,24 @@ export default function ReceiptListPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <CustomModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+        type="delete"
+        title="ยืนยันการลบใบเสร็จ?"
+        message={`คุณต้องการลบใบเสร็จเลขที่ ${deleteTarget?.receiptNo} (เล่มที่ ${deleteTarget?.bookNo || 1}) ใช่หรือไม่? การดำเนินการนี้จะลบข้อมูลออกจาก Google Sheets ด้วย`}
+        details={deleteTarget ? [
+          { label: 'ผู้บริจาค/ผู้ชำระ', value: deleteTarget.receivedFrom || '-' },
+          { label: 'รายการ', value: deleteTarget.description || '-' },
+          { label: 'จำนวนเงิน', value: `฿${formatBaht(deleteTarget.amount)}`, isBaht: true },
+          { label: 'วันที่', value: deleteTarget.date || '-' },
+        ] : []}
+        confirmText="ยืนยันการลบข้อมูล"
+        cancelText="ยกเลิก"
+      />
     </div>
   );
 }
