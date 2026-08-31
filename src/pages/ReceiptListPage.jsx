@@ -16,6 +16,7 @@ export default function ReceiptListPage() {
   const sheetUrl = getGoogleSheetUrl(settings?.spreadsheetUrl);
 
   const [search, setSearch] = useState('');
+  const [selectedBookNo, setSelectedBookNo] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
@@ -23,8 +24,20 @@ export default function ReceiptListPage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const PAGE_SIZE = 15;
 
+  // รวบรวมรายชื่อเล่มที่มีในระบบทั้งหมดเพื่อใช้เป็นตัวเลือกใน Filter
+  const availableBooks = useMemo(() => {
+    const set = new Set();
+    receipts.forEach(r => {
+      if (r.bookNo) set.add(String(r.bookNo).trim());
+    });
+    return Array.from(set).sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
+  }, [receipts]);
+
   const filtered = useMemo(() => {
     let list = [...receipts];
+    if (selectedBookNo) {
+      list = list.filter(r => String(r.bookNo || '').trim() === String(selectedBookNo).trim());
+    }
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(r =>
@@ -37,13 +50,13 @@ export default function ReceiptListPage() {
     if (startDate) list = list.filter(r => (r.createdAt || r.date) >= startDate);
     if (endDate) list = list.filter(r => (r.createdAt?.split('T')[0] || r.date) <= endDate);
     return list;
-  }, [receipts, search, startDate, endDate]);
+  }, [receipts, selectedBookNo, search, startDate, endDate]);
 
   const totalAmount = filtered.reduce((s, r) => s + (Number(r.amount) || 0), 0);
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageData = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const resetFilters = () => { setSearch(''); setStartDate(''); setEndDate(''); setPage(1); };
+  const resetFilters = () => { setSearch(''); setSelectedBookNo(''); setStartDate(''); setEndDate(''); setPage(1); };
 
   const handleDeleteClick = (item) => {
     setDeleteTarget(item);
@@ -90,8 +103,8 @@ export default function ReceiptListPage() {
 
       {/* Filters */}
       <div className="glass-card no-print" style={{ padding: '16px 20px', marginBottom: 20 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr auto', gap: 12, alignItems: 'end' }}>
-          <div className="form-group">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr)) auto', gap: 12, alignItems: 'end' }}>
+          <div className="form-group" style={{ gridColumn: 'span 2' }}>
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Search size={12} style={{ color: '#c9a84c' }} />
               ค้นหา (เลขที่ / ชื่อผู้จ่าย / รายการ)
@@ -103,6 +116,26 @@ export default function ReceiptListPage() {
               placeholder="พิมพ์คำค้นหา..."
             />
           </div>
+
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <BookOpen size={12} style={{ color: '#c9a84c' }} />
+              เลือกเล่มที่
+            </label>
+            <select
+              className="form-select"
+              value={selectedBookNo}
+              onChange={e => { setSelectedBookNo(e.target.value); setPage(1); }}
+            >
+              <option value="">-- ทุกเล่ม --</option>
+              {availableBooks.map(b => (
+                <option key={b} value={b}>
+                  เล่มที่ {b}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="form-group">
             <label className="form-label">ตั้งแต่วันที่</label>
             <input type="date" className="form-input" value={startDate} onChange={e => { setStartDate(e.target.value); setPage(1); }} />
@@ -111,7 +144,7 @@ export default function ReceiptListPage() {
             <label className="form-label">ถึงวันที่</label>
             <input type="date" className="form-input" value={endDate} onChange={e => { setEndDate(e.target.value); setPage(1); }} />
           </div>
-          <button className="btn btn-ghost" onClick={resetFilters} style={{ marginBottom: 0 }}>
+          <button className="btn btn-ghost btn-md" onClick={resetFilters} title="ล้างตัวกรอง" style={{ height: 42 }}>
             <RotateCcw size={14} /> รีเซ็ต
           </button>
         </div>
