@@ -15,13 +15,54 @@ import {
 function DonorPrefixSelect({ value, onChange }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [isCustomMode, setIsCustomMode] = useState(false);
   const ref = useRef(null);
+
+  const allItems = ALL_PREFIX_GROUPS.flatMap(g => g.items);
+  const isPredefined = allItems.includes(value);
 
   useEffect(() => {
     const fn = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener('mousedown', fn);
     return () => document.removeEventListener('mousedown', fn);
   }, []);
+
+  const handleSelect = (item) => {
+    if (item === '__CUSTOM__') {
+      setIsCustomMode(true);
+      setOpen(false);
+      onChange('');
+    } else {
+      setIsCustomMode(false);
+      onChange(item);
+      setOpen(false);
+      setSearch('');
+    }
+  };
+
+  if (isCustomMode || (value && !isPredefined)) {
+    return (
+      <div style={{ display: 'flex', gap: 6, width: '100%' }}>
+        <input
+          className="form-input"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder="พิมพ์ยศ / คำนำหน้าเอง..."
+          autoFocus
+          style={{ flex: 1 }}
+        />
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => { setIsCustomMode(false); onChange(''); }}
+          title="เลือกจากรายการแทน"
+          style={{ padding: '0 10px', fontSize: 11, color: '#c9a84c', whiteSpace: 'nowrap' }}
+        >
+          เลือกจากรายการ
+        </button>
+      </div>
+    );
+  }
 
   const filtered = ALL_PREFIX_GROUPS.map(group => ({
     ...group,
@@ -31,7 +72,7 @@ function DonorPrefixSelect({ value, onChange }) {
   })).filter(g => g.items.length > 0);
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} style={{ position: 'relative', width: '100%' }}>
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
@@ -60,16 +101,40 @@ function DonorPrefixSelect({ value, onChange }) {
           maxHeight: 320, overflowY: 'auto',
           animation: 'slideUp 0.2s ease',
         }}>
-          <div style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ padding: '8px 10px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'flex', gap: 6 }}>
             <input
               className="form-input"
-              style={{ padding: '7px 12px', fontSize: 13 }}
+              style={{ padding: '7px 12px', fontSize: 13, flex: 1 }}
               placeholder="ค้นหายศ / คำนำหน้า..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               autoFocus
             />
+            <button
+              type="button"
+              className="btn btn-gold btn-sm"
+              onClick={() => handleSelect('__CUSTOM__')}
+              style={{ fontSize: 11, whiteSpace: 'nowrap', padding: '0 10px' }}
+            >
+              ✍️ พิมพ์เอง
+            </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => handleSelect('__CUSTOM__')}
+            style={{
+              display: 'block', width: '100%', textAlign: 'left',
+              padding: '10px 16px', fontSize: 13, fontWeight: 700,
+              background: 'rgba(201,168,76,0.12)',
+              color: '#c9a84c',
+              borderBottom: '1px dashed rgba(201,168,76,0.3)', cursor: 'pointer',
+              fontFamily: 'var(--font-thai)',
+            }}
+          >
+            ✏️ — กรอกยศ / คำนำหน้าเอง (เช่น บริษัท, หจก., พระครู) —
+          </button>
+
           {filtered.map(group => (
             <div key={group.group}>
               <div style={{
@@ -83,7 +148,7 @@ function DonorPrefixSelect({ value, onChange }) {
                 <button
                   key={item}
                   type="button"
-                  onClick={() => { onChange(item); setOpen(false); setSearch(''); }}
+                  onClick={() => handleSelect(item)}
                   style={{
                     display: 'block', width: '100%', textAlign: 'left',
                     padding: '8px 16px', fontSize: 13,

@@ -88,8 +88,34 @@ export const OTHER_TITLES = [
   'นายแพทย์',
 ];
 
+// บริษัท / องค์กร / นิติบุคคล
+export const COMPANY_TITLES = [
+  'บริษัท',
+  'บริษัท จำกัด',
+  'บริษัท มหาชน จำกัด',
+  'ห้างหุ้นส่วนจำกัด',
+  'ห้างหุ้นส่วนสามัญ',
+  'ร้าน',
+  'มูลนิธิ',
+  'สมาคม',
+  'คณะ',
+  'ชมรม',
+  'สถาบัน',
+  'โรงเรียน',
+  'มหาวิทยาลัย',
+  'วัด',
+];
+
 // รวมทุกหมวด สำหรับ Dropdown
 export const ALL_PREFIX_GROUPS = [
+  {
+    group: 'บริษัท / องค์กร / นิติบุคคล',
+    items: COMPANY_TITLES,
+  },
+  {
+    group: 'คำนำหน้าพลเรือน (ไทย)',
+    items: CIVILIAN_TITLES_TH,
+  },
   {
     group: 'ยศตำรวจ (เรียงสูง -> ต่ำ)',
     items: POLICE_RANKS,
@@ -97,10 +123,6 @@ export const ALL_PREFIX_GROUPS = [
   {
     group: 'ยศทหาร',
     items: MILITARY_RANKS,
-  },
-  {
-    group: 'คำนำหน้าพลเรือน (ไทย)',
-    items: CIVILIAN_TITLES_TH,
   },
   {
     group: 'ต่างชาติ',
