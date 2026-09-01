@@ -106,14 +106,6 @@ export const COMPANY_TITLES = [
 // รวมทุกหมวด สำหรับ Dropdown
 export const ALL_PREFIX_GROUPS = [
   {
-    group: 'บริษัท / องค์กร / นิติบุคคล',
-    items: COMPANY_TITLES,
-  },
-  {
-    group: 'คำนำหน้าพลเรือน (ไทย)',
-    items: CIVILIAN_TITLES_TH,
-  },
-  {
     group: 'ยศตำรวจ (เรียงสูง -> ต่ำ)',
     items: POLICE_RANKS,
   },
@@ -128,6 +120,14 @@ export const ALL_PREFIX_GROUPS = [
   {
     group: 'อื่นๆ',
     items: OTHER_TITLES,
+  },
+  {
+    group: 'คำนำหน้าพลเรือน (ไทย)',
+    items: CIVILIAN_TITLES_TH,
+  },
+  {
+    group: 'บริษัท / องค์กร / นิติบุคคล',
+    items: COMPANY_TITLES,
   },
 ];
 
